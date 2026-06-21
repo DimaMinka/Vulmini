@@ -1,9 +1,9 @@
 # ==========================================
 # VULMINI — Production Docker Compose
 # ==========================================
-# Стек: Nginx + PHP-FPM 8.3 + MariaDB 11.4 + Redis 7.2
-# Оптимизирован под Vultr High-Frequency (Tel-Aviv)
-# Домен: vulmini.wl.mk | SSL: Let's Encrypt
+# Stack: Nginx + PHP-FPM 8.3 + MariaDB 11.4 + Redis 7.2
+# Optimized for Vultr High-Frequency (Tel-Aviv)
+# Domain: vulmini.wl.mk | SSL: Let's Encrypt
 
 x-logging: &default-logging
   driver: "json-file"
@@ -12,7 +12,7 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
-  # ── 1. MariaDB — Тюнинг под Vultr HF NVMe ──
+  # ── 1. MariaDB — Tuned for Vultr HF NVMe ──
   vulmini_db:
     image: mariadb:11.4
     container_name: vulmini_db
@@ -52,7 +52,7 @@ services:
     networks:
       - vulmini_net
 
-  # ── 2. Redis — Объектный кэш для LearnDash ──
+  # ── 2. Redis — Object Cache for LearnDash ──
   vulmini_cache:
     image: redis:7.2-alpine
     container_name: vulmini_cache
@@ -84,7 +84,7 @@ services:
     networks:
       - vulmini_net
 
-  # ── 3. PHP-FPM + WordPress — Вычислительный узел ──
+  # ── 3. PHP-FPM + WordPress — Compute Node ──
   vulmini_app:
     image: wordpress:6.7-php8.3-fpm-alpine
     container_name: vulmini_app
@@ -125,8 +125,8 @@ services:
     networks:
       - vulmini_net
 
-  # ── 4. WP-Cron — Изолированный для LearnDash ──
-  # Рассылки, scheduled quizzes, drip content
+  # ── 4. WP-Cron — Isolated for LearnDash ──
+  # Newsletters, scheduled quizzes, drip content
   vulmini_cron:
     image: wordpress:6.7-php8.3-fpm-alpine
     container_name: vulmini_cron
@@ -151,7 +151,8 @@ services:
       - ./wordpress-core:/var/www/html
       - ./wp-content:/var/www/html/wp-content
     entrypoint: /bin/sh
-    command: ["-c", "while true; do php /var/www/html/wp-cron.php; sleep 60; done"]
+    command:
+      ["-c", "while true; do php /var/www/html/wp-cron.php; sleep 60; done"]
     logging: *default-logging
     deploy:
       resources:
@@ -160,7 +161,7 @@ services:
     networks:
       - vulmini_net
 
-  # ── 5. Nginx — Веб-сервер + FastCGI кэш ──
+  # ── 5. Nginx — Web Server + FastCGI Cache ──
   vulmini_web:
     image: nginx:1.27-alpine
     container_name: vulmini_web
@@ -178,7 +179,15 @@ services:
       - certbot_www:/var/www/certbot:ro
       - nginx_cache:/var/cache/nginx
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost/nginx-health",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -190,7 +199,7 @@ services:
     networks:
       - vulmini_net
 
-  # ── 6. Certbot — Let's Encrypt для vulmini.wl.mk ──
+  # ── 6. Certbot — Let's Encrypt for vulmini.wl.mk ──
   vulmini_certbot:
     image: certbot/certbot
     container_name: vulmini_certbot

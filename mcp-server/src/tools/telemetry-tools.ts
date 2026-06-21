@@ -1,12 +1,16 @@
 // ==========================================
 // VULMINI — Telemetry MCP Tools
 // ==========================================
-// Инструменты мониторинга: CPU, RAM, диск, логи,
-// статус Docker-контейнеров.
+// Monitoring tools: CPU, RAM, disk, logs,
+// and Docker container status.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { SshExecutor } from "../services/ssh-executor.js";
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const targetSchema = z
   .enum(["production", "staging"])
@@ -15,7 +19,7 @@ const targetSchema = z
 export function registerTelemetryTools(
   server: McpServer,
   ssh: SshExecutor,
-  getHost: (target: "production" | "staging") => string
+  getHost: (target: "production" | "staging") => string,
 ): void {
   // ── get_system_health ──
   server.tool(
@@ -37,7 +41,7 @@ export function registerTelemetryTools(
   "uptime_seconds": $(cat /proc/uptime | awk '{print int($1)}')
 }
 HEALTH_EOF`,
-          { host }
+          { host },
         );
 
         // Parse the raw output into structured JSON
@@ -77,7 +81,7 @@ HEALTH_EOF`,
           ],
         };
       }
-    }
+    },
   );
 
   // ── fetch_error_logs ──
@@ -100,7 +104,7 @@ HEALTH_EOF`,
         const result = await ssh.executeInContainer(
           "vulmini_app",
           `sh -c "tail -n ${lines} /var/www/html/wp-content/debug.log 2>/dev/null || echo 'No debug.log found (WP_DEBUG may be off)'"`,
-          { host }
+          { host },
         );
         return {
           content: [
@@ -113,7 +117,7 @@ HEALTH_EOF`,
                   log_content: result.stdout,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -126,7 +130,7 @@ HEALTH_EOF`,
           ],
         };
       }
-    }
+    },
   );
 
   // ── fetch_nginx_logs ──
@@ -158,7 +162,7 @@ HEALTH_EOF`,
         const result = await ssh.executeInContainer(
           "vulmini_web",
           `tail -n ${lines} ${logFile} 2>/dev/null || echo 'Log file not found'`,
-          { host }
+          { host },
         );
         return {
           content: [
@@ -172,7 +176,7 @@ HEALTH_EOF`,
                   log_content: result.stdout,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -185,7 +189,7 @@ HEALTH_EOF`,
           ],
         };
       }
-    }
+    },
   );
 
   // ── get_docker_status ──
@@ -200,7 +204,7 @@ HEALTH_EOF`,
         const host = getHost(target);
         const result = await ssh.execute(
           `docker ps --format '{"name":"{{.Names}}","state":"{{.State}}","status":"{{.Status}}","health":"{{.Label "com.docker.compose.service"}}"}' --filter "label=com.docker.compose.project" | head -20`,
-          { host }
+          { host },
         );
 
         // Parse each line as JSON
@@ -222,7 +226,7 @@ HEALTH_EOF`,
               text: JSON.stringify(
                 { target, containers, total: containers.length },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -235,7 +239,94 @@ HEALTH_EOF`,
           ],
         };
       }
-    }
+    },
+  );
+
+  // ── deploy_stack ──
+  server.tool(
+    "deploy_stack",
+    "Deploy/Redeploy the Docker stack (WordPress, MariaDB, Nginx, PHP, Cron) to the target server. Packages local project configuration, uploads it, installs Docker if needed, and starts the container stack.",
+    {
+      target: targetSchema,
+    },
+    async ({ target }) => {
+      const tarFile = "vulmini_deploy.tar.gz";
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      // Root of the project is 3 levels up from dist/tools/telemetry-tools.js
+      const projectRoot = path.resolve(__dirname, "../../../");
+      const localTarPath = path.join(projectRoot, tarFile);
+      const host = getHost(target);
+
+      try {
+        // 1. Pack project files locally
+        execSync(
+          `tar -czf "${localTarPath}" -C "${projectRoot}" docker-compose.yml .env nginx php scripts`,
+          { stdio: "pipe" },
+        );
+      } catch (err) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to package local project files: ${err}`,
+            },
+          ],
+        };
+      }
+
+      try {
+        // 2. Check/Install Docker on remote host
+        const checkDocker = await ssh.execute(
+          "which docker || echo 'missing'",
+          { host },
+        );
+        if (checkDocker.stdout.includes("missing")) {
+          // Install Docker
+          await ssh.execute(
+            "curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh",
+            { host, timeoutMs: 300_000 },
+          );
+        }
+
+        // 3. Upload tarball
+        const remoteTar = "/root/vulmini.tar.gz";
+        await ssh.uploadFile(localTarPath, remoteTar, { host });
+
+        // 4. Extract tarball
+        await ssh.execute(
+          "mkdir -p /root/vulmini && tar -xzf /root/vulmini.tar.gz -C /root/vulmini",
+          { host },
+        );
+
+        // 5. Run Docker Compose
+        const composeResult = await ssh.execute(
+          "cd /root/vulmini && docker compose down && docker compose up -d",
+          { host, timeoutMs: 300_000 },
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Docker Stack deployed successfully to ${target} (${host})!\n\nOutput:\n${composeResult.stdout}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `Deployment failed on ${target}: ${error}` },
+          ],
+        };
+      } finally {
+        // Clean up local tarball
+        if (fs.existsSync(localTarPath)) {
+          fs.unlinkSync(localTarPath);
+        }
+      }
+    },
   );
 }
 

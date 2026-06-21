@@ -1,8 +1,8 @@
 // ==========================================
 // VULMINI — WP-CLI MCP Tools
 // ==========================================
-// Инструменты для Gemini: управление WordPress
-// через WP-CLI внутри Docker-контейнера.
+// Tools for Gemini: WordPress management
+// via WP-CLI inside the Docker container.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -14,7 +14,7 @@ const targetSchema = z
 
 export function registerWpCliTools(
   server: McpServer,
-  wpCli: WpCliService
+  wpCli: WpCliService,
 ): void {
   // ── wp_plugin_status ──
   server.tool(
@@ -26,7 +26,9 @@ export function registerWpCliTools(
     async ({ target }) => {
       try {
         const plugins = await wpCli.getPluginStatus(target);
-        const updatesAvailable = plugins.filter((p) => p.update === "available");
+        const updatesAvailable = plugins.filter(
+          (p) => p.update === "available",
+        );
         return {
           content: [
             {
@@ -39,7 +41,7 @@ export function registerWpCliTools(
                   all_plugins: plugins,
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -52,7 +54,7 @@ export function registerWpCliTools(
           ],
         };
       }
-    }
+    },
   );
 
   // ── wp_run_update ──
@@ -65,7 +67,7 @@ export function registerWpCliTools(
         .string()
         .optional()
         .describe(
-          "Specific plugin slug to update. Omit to update ALL plugins."
+          "Specific plugin slug to update. Omit to update ALL plugins.",
         ),
     },
     async ({ target, plugin_slug }) => {
@@ -84,7 +86,7 @@ export function registerWpCliTools(
                     "Update completed. Run wp_health_check to verify the site is healthy.",
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -100,7 +102,7 @@ export function registerWpCliTools(
           ],
         };
       }
-    }
+    },
   );
 
   // ── wp_db_migrate ──
@@ -125,7 +127,7 @@ export function registerWpCliTools(
                     "Database migration complete. Run wp_health_check to verify.",
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -134,11 +136,14 @@ export function registerWpCliTools(
         return {
           isError: true,
           content: [
-            { type: "text", text: `DB migration failed on ${target}: ${error}` },
+            {
+              type: "text",
+              text: `DB migration failed on ${target}: ${error}`,
+            },
           ],
         };
       }
-    }
+    },
   );
 
   // ── wp_health_check ──
@@ -163,11 +168,14 @@ export function registerWpCliTools(
         return {
           isError: true,
           content: [
-            { type: "text", text: `Health check failed on ${target}: ${error}` },
+            {
+              type: "text",
+              text: `Health check failed on ${target}: ${error}`,
+            },
           ],
         };
       }
-    }
+    },
   );
 
   // ── wp_run_backup ──
@@ -179,7 +187,9 @@ export function registerWpCliTools(
       scope: z
         .enum(["full", "db", "plugin"])
         .default("full")
-        .describe("Backup scope: 'full' (DB + plugins), 'db' only, or 'plugin' (specific plugin)"),
+        .describe(
+          "Backup scope: 'full' (DB + plugins), 'db' only, or 'plugin' (specific plugin)",
+        ),
       plugin_slug: z
         .string()
         .optional()
@@ -201,7 +211,7 @@ export function registerWpCliTools(
                     "Backup created. Save the backup_id for potential rollback with wp_run_restore.",
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -209,10 +219,12 @@ export function registerWpCliTools(
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: `Backup failed on ${target}: ${error}` }],
+          content: [
+            { type: "text", text: `Backup failed on ${target}: ${error}` },
+          ],
         };
       }
-    }
+    },
   );
 
   // ── wp_run_restore ──
@@ -223,7 +235,9 @@ export function registerWpCliTools(
       target: targetSchema,
       backup_id: z
         .string()
-        .describe("The backup_id (timestamp like '20250621_143000') from wp_run_backup"),
+        .describe(
+          "The backup_id (timestamp like '20250621_143000') from wp_run_backup",
+        ),
       scope: z
         .enum(["full", "db", "plugins"])
         .default("full")
@@ -246,7 +260,7 @@ export function registerWpCliTools(
                     "Restore completed. Run wp_health_check to verify the site is healthy again.",
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -259,7 +273,7 @@ export function registerWpCliTools(
           ],
         };
       }
-    }
+    },
   );
 
   // ── set_staging_host ──
@@ -279,6 +293,6 @@ export function registerWpCliTools(
           },
         ],
       };
-    }
+    },
   );
 }

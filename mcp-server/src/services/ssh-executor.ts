@@ -1,8 +1,8 @@
 // ==========================================
 // VULMINI — SSH Command Executor
 // ==========================================
-// Выполняет команды на удалённых VPS через SSH.
-// Используется WP-CLI и телеметрией для управления сервером.
+// Executes commands on remote VPS hosts via SSH.
+// Used by WP-CLI and telemetry to manage the server.
 
 import { Client } from "ssh2";
 import { readFileSync } from "node:fs";
@@ -51,7 +51,7 @@ export class SshExecutor {
     options?: {
       host?: string;
       timeoutMs?: number;
-    }
+    },
   ): Promise<SshCommandResult> {
     const host = options?.host ?? this.config.host;
     const timeoutMs = options?.timeoutMs ?? 60_000;
@@ -67,8 +67,8 @@ export class SshExecutor {
         conn.end();
         reject(
           new Error(
-            `SSH command timed out after ${timeoutMs}ms: ${command.slice(0, 100)}`
-          )
+            `SSH command timed out after ${timeoutMs}ms: ${command.slice(0, 100)}`,
+          ),
         );
       }, timeoutMs);
 
@@ -93,7 +93,11 @@ export class SshExecutor {
             clearTimeout(timer);
             conn.end();
             if (!timedOut) {
-              resolve({ stdout: stdout.trim(), stderr: stderr.trim(), exitCode: code ?? 0 });
+              resolve({
+                stdout: stdout.trim(),
+                stderr: stderr.trim(),
+                exitCode: code ?? 0,
+              });
             }
           });
         });
@@ -107,7 +111,7 @@ export class SshExecutor {
       });
 
       const privateKey = readFileSync(
-        this.resolveKeyPath(this.config.privateKeyPath)
+        this.resolveKeyPath(this.config.privateKeyPath),
       );
 
       conn.connect({
@@ -131,13 +135,64 @@ export class SshExecutor {
       host?: string;
       timeoutMs?: number;
       user?: string;
-    }
+    },
   ): Promise<SshCommandResult> {
     const user = options?.user ? `--user ${options.user}` : "";
     const dockerCommand = `docker exec ${user} ${containerName} ${command}`;
     return this.execute(dockerCommand, {
       host: options?.host,
       timeoutMs: options?.timeoutMs ?? 120_000, // Docker commands may be slower
+    });
+  }
+  /**
+   * Upload a file to the remote server via SFTP.
+   */
+  async uploadFile(
+    localPath: string,
+    remotePath: string,
+    options?: { host?: string },
+  ): Promise<void> {
+    const host = options?.host ?? this.config.host;
+
+    return new Promise((resolvePromise, reject) => {
+      const conn = new Client();
+
+      conn.on("ready", () => {
+        conn.sftp((err, sftp) => {
+          if (err) {
+            conn.end();
+            reject(err);
+            return;
+          }
+
+          sftp.fastPut(localPath, remotePath, {}, (err) => {
+            conn.end();
+            if (err) {
+              reject(err);
+            } else {
+              resolvePromise();
+            }
+          });
+        });
+      });
+
+      conn.on("error", (err) => {
+        reject(
+          new Error(`SFTP SSH connection error to ${host}: ${err.message}`),
+        );
+      });
+
+      const privateKey = readFileSync(
+        this.resolveKeyPath(this.config.privateKeyPath),
+      );
+
+      conn.connect({
+        host,
+        port: this.config.port,
+        username: this.config.username,
+        privateKey,
+        readyTimeout: 10_000,
+      });
     });
   }
 }

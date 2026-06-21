@@ -1,17 +1,21 @@
 // ==========================================
 // VULMINI — Vultr MCP Tools
 // ==========================================
-// Инструменты для Gemini: управление VPS и снапшотами
-// через Vultr API v2. Ядро паттерна «Близнецов».
+// Tools for Gemini: VPS and snapshot management
+// via Vultr API v2. Core of the "Twin-Instance" pattern.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { VultrApiClient } from "../services/vultr-api.js";
+import fs from "node:fs";
+import path from "node:path";
+import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 export function registerVultrTools(
   server: McpServer,
   vultr: VultrApiClient,
-  defaultConfig: { region: string; plan: string }
+  defaultConfig: { region: string; plan: string },
 ): void {
   // ── list_instances ──
   server.tool(
@@ -37,7 +41,7 @@ export function registerVultrTools(
                   tags: i.tags,
                 })),
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -45,10 +49,12 @@ export function registerVultrTools(
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: `Failed to list instances: ${error}` }],
+          content: [
+            { type: "text", text: `Failed to list instances: ${error}` },
+          ],
         };
       }
-    }
+    },
   );
 
   // ── get_instance_status ──
@@ -70,7 +76,7 @@ export function registerVultrTools(
           content: [{ type: "text", text: `Failed to get instance: ${error}` }],
         };
       }
-    }
+    },
   );
 
   // ── create_snapshot ──
@@ -103,7 +109,7 @@ export function registerVultrTools(
                     "Snapshot creation started. Use get_snapshot_status to monitor progress. It may take 5-30 minutes.",
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -111,10 +117,12 @@ export function registerVultrTools(
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: `Failed to create snapshot: ${error}` }],
+          content: [
+            { type: "text", text: `Failed to create snapshot: ${error}` },
+          ],
         };
       }
-    }
+    },
   );
 
   // ── get_snapshot_status ──
@@ -139,7 +147,7 @@ export function registerVultrTools(
                   size_gb: (snapshot.size / 1_073_741_824).toFixed(2),
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -150,7 +158,7 @@ export function registerVultrTools(
           content: [{ type: "text", text: `Failed to get snapshot: ${error}` }],
         };
       }
-    }
+    },
   );
 
   // ── create_ephemeral_staging ──
@@ -191,7 +199,7 @@ export function registerVultrTools(
                     "Staging VPS created. It will take 1-5 minutes to become active. Use get_instance_status to check. Once active, you can run WP-CLI commands on it.",
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -204,7 +212,7 @@ export function registerVultrTools(
           ],
         };
       }
-    }
+    },
   );
 
   // ── destroy_ephemeral_staging ──
@@ -245,10 +253,11 @@ export function registerVultrTools(
                 {
                   destroyed: instance_id,
                   label: instance.label,
-                  message: "Staging VPS destroyed successfully. Resources freed.",
+                  message:
+                    "Staging VPS destroyed successfully. Resources freed.",
                 },
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -261,7 +270,7 @@ export function registerVultrTools(
           ],
         };
       }
-    }
+    },
   );
 
   // ── list_snapshots ──
@@ -285,7 +294,7 @@ export function registerVultrTools(
                   created: s.date_created,
                 })),
                 null,
-                2
+                2,
               ),
             },
           ],
@@ -293,9 +302,253 @@ export function registerVultrTools(
       } catch (error) {
         return {
           isError: true,
-          content: [{ type: "text", text: `Failed to list snapshots: ${error}` }],
+          content: [
+            { type: "text", text: `Failed to list snapshots: ${error}` },
+          ],
         };
       }
-    }
+    },
+  );
+
+  // ── create_production_vps ──
+  server.tool(
+    "create_production_vps",
+    "Deploy a new production VPS on Vultr, set up SSH key, wait for activation, and update project .env file with the IP",
+    {},
+    async () => {
+      try {
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
+        const envPath = path.resolve(__dirname, "../../../.env");
+        let envContent = "";
+        try {
+          envContent = fs.readFileSync(envPath, "utf-8");
+        } catch (e) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: `Could not read .env file at ${envPath}: ${e}`,
+              },
+            ],
+          };
+        }
+
+        const getEnvVal = (name: string) => {
+          const match = envContent.match(new RegExp(`${name}=([^\\r\\n]*)`));
+          return match ? match[1].trim() : null;
+        };
+
+        const sshKeyPathRaw =
+          getEnvVal("SSH_PRIVATE_KEY_PATH") || "~/.ssh/vulmini_rsa";
+        const sshKeyPath = sshKeyPathRaw.replace(/^~/, homedir());
+        const pubKeyPath = sshKeyPath + ".pub";
+
+        if (!fs.existsSync(pubKeyPath)) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: `SSH public key not found at: ${pubKeyPath}. Please generate it first or check your SSH_PRIVATE_KEY_PATH in .env`,
+              },
+            ],
+          };
+        }
+
+        const sshPublicKeyContent = fs.readFileSync(pubKeyPath, "utf-8").trim();
+
+        // 1. Check SSH Keys on Vultr
+        const keysData = await vultr.listSshKeys();
+        let sshKeyId = null;
+
+        const existingKey = keysData.ssh_keys.find(
+          (k) =>
+            k.name === "vulmini-key" ||
+            k.ssh_key.includes(sshPublicKeyContent.slice(10, 50)),
+        );
+
+        if (existingKey) {
+          sshKeyId = existingKey.id;
+        } else {
+          const newKey = await vultr.createSshKey(
+            "vulmini-key",
+            sshPublicKeyContent,
+          );
+          sshKeyId = newKey.ssh_key.id;
+        }
+
+        // 2. Create Instance
+        const instance = await vultr.createInstance({
+          region: defaultConfig.region,
+          plan: defaultConfig.plan,
+          os_id: 2284, // Ubuntu 24.04
+          label: "vulmini-prod",
+          hostname: "vulmini-prod",
+          sshkey_id: [sshKeyId],
+          enable_ipv6: true,
+          tags: ["vulmini", "production"],
+        });
+
+        const instanceId = instance.id;
+
+        // 3. Wait for it to become active
+        const activeInstance = await vultr.waitForInstanceActive(instanceId);
+        const ip = activeInstance.main_ip;
+
+        // 4. Update .env
+        envContent = envContent.replace(/SSH_HOST=[^\r\n]*/, `SSH_HOST=${ip}`);
+        envContent = envContent.replace(
+          /VULTR_PROD_INSTANCE_ID=[^\r\n]*/,
+          `VULTR_PROD_INSTANCE_ID=${instanceId}`,
+        );
+        fs.writeFileSync(envPath, envContent, "utf-8");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  instance_id: instanceId,
+                  ip: ip,
+                  status: activeInstance.status,
+                  message: `Production VPS deployed successfully! Configuration in .env updated with SSH_HOST=${ip} and VULTR_PROD_INSTANCE_ID=${instanceId}.`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to create production VPS: ${error.message || error}`,
+            },
+          ],
+        };
+      }
+    },
+  );
+
+  // ── create_clean_staging ──
+  server.tool(
+    "create_clean_staging",
+    "Deploy a new clean staging VPS from scratch on Vultr (not from a snapshot), set up SSH key, wait for activation, and return the IP",
+    {},
+    async () => {
+      try {
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
+        const envPath = path.resolve(__dirname, "../../../.env");
+        let envContent = "";
+        try {
+          envContent = fs.readFileSync(envPath, "utf-8");
+        } catch (e) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: `Could not read .env file at ${envPath}: ${e}`,
+              },
+            ],
+          };
+        }
+
+        const getEnvVal = (name: string) => {
+          const match = envContent.match(new RegExp(`${name}=([^\\r\\n]*)`));
+          return match ? match[1].trim() : null;
+        };
+
+        const sshKeyPathRaw =
+          getEnvVal("SSH_PRIVATE_KEY_PATH") || "~/.ssh/vulmini_rsa";
+        const sshKeyPath = sshKeyPathRaw.replace(/^~/, homedir());
+        const pubKeyPath = sshKeyPath + ".pub";
+
+        if (!fs.existsSync(pubKeyPath)) {
+          return {
+            isError: true,
+            content: [
+              {
+                type: "text",
+                text: `SSH public key not found at: ${pubKeyPath}. Please generate it first or check your SSH_PRIVATE_KEY_PATH in .env`,
+              },
+            ],
+          };
+        }
+
+        const sshPublicKeyContent = fs.readFileSync(pubKeyPath, "utf-8").trim();
+
+        // 1. Check SSH Keys on Vultr
+        const keysData = await vultr.listSshKeys();
+        let sshKeyId = null;
+
+        const existingKey = keysData.ssh_keys.find(
+          (k) =>
+            k.name === "vulmini-key" ||
+            k.ssh_key.includes(sshPublicKeyContent.slice(10, 50)),
+        );
+
+        if (existingKey) {
+          sshKeyId = existingKey.id;
+        } else {
+          const newKey = await vultr.createSshKey(
+            "vulmini-key",
+            sshPublicKeyContent,
+          );
+          sshKeyId = newKey.ssh_key.id;
+        }
+
+        // 2. Create Instance
+        const instance = await vultr.createInstance({
+          region: defaultConfig.region,
+          plan: defaultConfig.plan,
+          os_id: 2284, // Ubuntu 24.04
+          label: "vulmini-stage",
+          hostname: "vulmini-stage",
+          sshkey_id: [sshKeyId],
+          enable_ipv6: true,
+          tags: ["vulmini", "staging"],
+        });
+
+        const instanceId = instance.id;
+
+        // 3. Wait for it to become active
+        const activeInstance = await vultr.waitForInstanceActive(instanceId);
+        const ip = activeInstance.main_ip;
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  instance_id: instanceId,
+                  ip: ip,
+                  status: activeInstance.status,
+                  message: `Staging VPS deployed successfully! IP is ${ip}. The VPS is currently clean. Remember to run set_staging_host with this IP, and then run the deploy_stack tool to install Docker and start the containers.`,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to create staging VPS: ${error.message || error}`,
+            },
+          ],
+        };
+      }
+    },
   );
 }

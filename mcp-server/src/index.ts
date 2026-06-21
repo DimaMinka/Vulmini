@@ -2,17 +2,20 @@
 // ==========================================
 // VULMINI — MCP Server Entry Point
 // ==========================================
-// Точка входа для MCP-сервера Vulmini.
-// Регистрирует все инструменты и подключается
-// через stdio-транспорт к Gemini (Antigravity CLI).
+// Entry point for the Vulmini MCP server.
+// Registers all tools and connects
+// via stdio transport to Gemini (Antigravity CLI).
 //
-// Запуск:
+// Execution:
 //   node dist/index.js       — production
 //   npx tsx src/index.ts      — development
 //   npx @modelcontextprotocol/inspector node dist/index.js — debug
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { VultrApiClient } from "./services/vultr-api.js";
 import { SshExecutor } from "./services/ssh-executor.js";
@@ -21,6 +24,30 @@ import { WpCliService } from "./services/wp-cli.js";
 import { registerVultrTools } from "./tools/vultr-tools.js";
 import { registerWpCliTools } from "./tools/wp-cli-tools.js";
 import { registerTelemetryTools } from "./tools/telemetry-tools.js";
+
+// ── Load Environment Variables from .env ──
+try {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const envPath = path.resolve(__dirname, "../../.env");
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, "utf-8");
+    envContent.split(/\r?\n/).forEach((line) => {
+      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+      if (match) {
+        const key = match[1];
+        let value = match[2] || "";
+        if (value.startsWith('"') && value.endsWith('"')) {
+          value = value.slice(1, -1);
+        } else if (value.startsWith("'") && value.endsWith("'")) {
+          value = value.slice(1, -1);
+        }
+        process.env[key] = value.trim();
+      }
+    });
+  }
+} catch (e) {
+  console.error("[Vulmini] Error loading .env file:", e);
+}
 
 // ── Configuration from Environment ──
 
@@ -43,7 +70,7 @@ const vultrApiKey = requireEnv("VULTR_API_KEY");
 const vultrRegion = optionalEnv("VULTR_REGION", "tlv");
 const vultrPlan = optionalEnv("VULTR_PLAN", "vhf-2c-4gb");
 
-const sshHost = requireEnv("SSH_HOST");
+const sshHost = optionalEnv("SSH_HOST", "");
 const sshPort = parseInt(optionalEnv("SSH_PORT", "22"), 10);
 const sshUser = optionalEnv("SSH_USER", "root");
 const sshKeyPath = optionalEnv("SSH_PRIVATE_KEY_PATH", "~/.ssh/vulmini_rsa");
@@ -83,10 +110,33 @@ registerWpCliTools(server, wpCli);
 // 3. Telemetry tools (system health, logs, Docker status)
 registerTelemetryTools(server, ssh, (target) => {
   if (target === "staging") {
+    try {
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const envPath = path.resolve(__dirname, "../../.env");
+      if (fs.existsSync(envPath)) {
+        const envContent = fs.readFileSync(envPath, "utf-8");
+        envContent.split(/\r?\n/).forEach((line) => {
+          const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+          if (match) {
+            const key = match[1];
+            let value = match[2] || "";
+            if (value.startsWith('"') && value.endsWith('"')) {
+              value = value.slice(1, -1);
+            } else if (value.startsWith("'") && value.endsWith("'")) {
+              value = value.slice(1, -1);
+            }
+            process.env[key] = value.trim();
+          }
+        });
+      }
+    } catch (e) {
+      console.error("[Vulmini] Error reloading .env file:", e);
+    }
+
     const stagingHost = process.env.VULMINI_STAGING_HOST;
     if (!stagingHost) {
       throw new Error(
-        "Staging host not configured. Use set_staging_host tool first."
+        "Staging host not configured. Use set_staging_host tool first.",
       );
     }
     return stagingHost;

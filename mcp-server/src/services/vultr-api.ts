@@ -1,8 +1,8 @@
 // ==========================================
 // VULMINI — Vultr API v2 Client
 // ==========================================
-// HTTP-клиент для Vultr REST API.
-// Управление инстансами, снапшотами, Object Storage.
+// HTTP Client for Vultr REST API.
+// Manages instances, snapshots, and Object Storage.
 
 import type {
   VultrInstance,
@@ -26,7 +26,7 @@ export class VultrApiClient {
   private async request<T>(
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
   ): Promise<T> {
     const url = `${VULTR_API_BASE}${path}`;
     const headers: Record<string, string> = {
@@ -48,11 +48,40 @@ export class VultrApiClient {
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(
-        `Vultr API error ${response.status} ${method} ${path}: ${errorText}`
+        `Vultr API error ${response.status} ${method} ${path}: ${errorText}`,
       );
     }
 
     return response.json() as Promise<T>;
+  }
+
+  // ── SSH Keys ──
+
+  /** List all SSH keys */
+  async listSshKeys(): Promise<{
+    ssh_keys: Array<{
+      id: string;
+      name: string;
+      ssh_key: string;
+      date_created: string;
+    }>;
+  }> {
+    return this.request("GET", "/ssh-keys");
+  }
+
+  /** Create a new SSH key */
+  async createSshKey(
+    name: string,
+    sshKey: string,
+  ): Promise<{
+    ssh_key: {
+      id: string;
+      name: string;
+      ssh_key: string;
+      date_created: string;
+    };
+  }> {
+    return this.request("POST", "/ssh-keys", { name, ssh_key: sshKey });
   }
 
   // ── Instances ──
@@ -61,7 +90,7 @@ export class VultrApiClient {
   async listInstances(): Promise<VultrInstance[]> {
     const data = await this.request<{ instances: VultrInstance[] }>(
       "GET",
-      "/instances"
+      "/instances",
     );
     return data.instances;
   }
@@ -70,19 +99,17 @@ export class VultrApiClient {
   async getInstance(instanceId: string): Promise<VultrInstance> {
     const data = await this.request<{ instance: VultrInstance }>(
       "GET",
-      `/instances/${instanceId}`
+      `/instances/${instanceId}`,
     );
     return data.instance;
   }
 
   /** Create a new instance (e.g., from snapshot for staging) */
-  async createInstance(
-    params: CreateInstanceRequest
-  ): Promise<VultrInstance> {
+  async createInstance(params: CreateInstanceRequest): Promise<VultrInstance> {
     const data = await this.request<{ instance: VultrInstance }>(
       "POST",
       "/instances",
-      params
+      params,
     );
     return data.instance;
   }
@@ -99,7 +126,7 @@ export class VultrApiClient {
   async waitForInstanceActive(
     instanceId: string,
     intervalMs = 10_000,
-    maxAttempts = 60
+    maxAttempts = 60,
   ): Promise<VultrInstance> {
     for (let i = 0; i < maxAttempts; i++) {
       const instance = await this.getInstance(instanceId);
@@ -107,12 +134,12 @@ export class VultrApiClient {
         return instance;
       }
       console.error(
-        `[Vulmini] Instance ${instanceId}: status=${instance.status}, power=${instance.power_status} (attempt ${i + 1}/${maxAttempts})`
+        `[Vulmini] Instance ${instanceId}: status=${instance.status}, power=${instance.power_status} (attempt ${i + 1}/${maxAttempts})`,
       );
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new Error(
-      `Instance ${instanceId} did not become active within ${(maxAttempts * intervalMs) / 1000}s`
+      `Instance ${instanceId} did not become active within ${(maxAttempts * intervalMs) / 1000}s`,
     );
   }
 
@@ -122,7 +149,7 @@ export class VultrApiClient {
   async listSnapshots(): Promise<VultrSnapshot[]> {
     const data = await this.request<{ snapshots: VultrSnapshot[] }>(
       "GET",
-      "/snapshots"
+      "/snapshots",
     );
     return data.snapshots;
   }
@@ -131,7 +158,7 @@ export class VultrApiClient {
   async getSnapshot(snapshotId: string): Promise<VultrSnapshot> {
     const data = await this.request<{ snapshot: VultrSnapshot }>(
       "GET",
-      `/snapshots/${snapshotId}`
+      `/snapshots/${snapshotId}`,
     );
     return data.snapshot;
   }
@@ -141,7 +168,7 @@ export class VultrApiClient {
     const data = await this.request<{ snapshot: VultrSnapshot }>(
       "POST",
       "/snapshots",
-      params
+      params,
     );
     return data.snapshot;
   }
@@ -155,7 +182,7 @@ export class VultrApiClient {
   async waitForSnapshotComplete(
     snapshotId: string,
     intervalMs = 15_000,
-    maxAttempts = 120
+    maxAttempts = 120,
   ): Promise<VultrSnapshot> {
     for (let i = 0; i < maxAttempts; i++) {
       const snapshot = await this.getSnapshot(snapshotId);
@@ -163,12 +190,12 @@ export class VultrApiClient {
         return snapshot;
       }
       console.error(
-        `[Vulmini] Snapshot ${snapshotId}: status=${snapshot.status} (attempt ${i + 1}/${maxAttempts})`
+        `[Vulmini] Snapshot ${snapshotId}: status=${snapshot.status} (attempt ${i + 1}/${maxAttempts})`,
       );
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new Error(
-      `Snapshot ${snapshotId} did not complete within ${(maxAttempts * intervalMs) / 1000}s`
+      `Snapshot ${snapshotId} did not complete within ${(maxAttempts * intervalMs) / 1000}s`,
     );
   }
 
@@ -186,7 +213,7 @@ export class VultrApiClient {
   async getObjectStorage(storageId: string): Promise<VultrObjectStorage> {
     const data = await this.request<{ object_storage: VultrObjectStorage }>(
       "GET",
-      `/object-storage/${storageId}`
+      `/object-storage/${storageId}`,
     );
     return data.object_storage;
   }

@@ -1,8 +1,8 @@
 // ==========================================
 // VULMINI — WP-CLI Service
 // ==========================================
-// Обёртка над WP-CLI для выполнения WordPress-команд
-// через SSH внутри Docker-контейнера vulmini_app.
+// Wrapper for WP-CLI to execute WordPress commands
+// via SSH inside the vulmini_app Docker container.
 
 import type { SshExecutor, SshCommandResult } from "./ssh-executor.js";
 import type {
@@ -50,7 +50,7 @@ export class WpCliService {
     if (target === "staging") {
       if (!this.targets.staging) {
         throw new Error(
-          "Staging host not set. Create an ephemeral staging instance first."
+          "Staging host not set. Create an ephemeral staging instance first.",
         );
       }
       return this.targets.staging;
@@ -65,13 +65,13 @@ export class WpCliService {
   private async wp(
     target: ServerTarget,
     command: string,
-    timeoutMs?: number
+    timeoutMs?: number,
   ): Promise<SshCommandResult> {
     const host = this.getHost(target);
     return this.ssh.executeInContainer(
       this.containerName,
       `wp ${command} --allow-root`,
-      { host, timeoutMs }
+      { host, timeoutMs },
     );
   }
 
@@ -81,7 +81,7 @@ export class WpCliService {
   async getPluginStatus(target: ServerTarget): Promise<WpPlugin[]> {
     const result = await this.wp(
       target,
-      "plugin list --format=json --fields=name,status,update,version,update_version,auto_update"
+      "plugin list --format=json --fields=name,status,update,version,update_version,auto_update",
     );
     if (result.exitCode !== 0) {
       throw new Error(`WP-CLI plugin list failed: ${result.stderr}`);
@@ -92,16 +92,18 @@ export class WpCliService {
   /** Update a specific plugin or all plugins */
   async updatePlugins(
     target: ServerTarget,
-    pluginSlug?: string
+    pluginSlug?: string,
   ): Promise<string> {
     const slugArg = pluginSlug ?? "--all";
     const result = await this.wp(
       target,
       `plugin update ${slugArg}`,
-      300_000 // 5 min timeout for updates
+      300_000, // 5 min timeout for updates
     );
     if (result.exitCode !== 0) {
-      throw new Error(`Plugin update failed: ${result.stderr}\n${result.stdout}`);
+      throw new Error(
+        `Plugin update failed: ${result.stderr}\n${result.stdout}`,
+      );
     }
     return result.stdout;
   }
@@ -115,15 +117,19 @@ export class WpCliService {
 
     // 1. WordPress core DB update
     const coreResult = await this.wp(target, "core update-db", 120_000);
-    results.push(`[core update-db] exit=${coreResult.exitCode}\n${coreResult.stdout}`);
+    results.push(
+      `[core update-db] exit=${coreResult.exitCode}\n${coreResult.stdout}`,
+    );
 
     // 2. LearnDash data upgrades
     const ldResult = await this.ssh.executeInContainer(
       this.containerName,
       "wp learndash data_upgrades --allow-root 2>&1 || echo 'LearnDash data_upgrades not available'",
-      { host, timeoutMs: 300_000 }
+      { host, timeoutMs: 300_000 },
     );
-    results.push(`[learndash data_upgrades] exit=${ldResult.exitCode}\n${ldResult.stdout}`);
+    results.push(
+      `[learndash data_upgrades] exit=${ldResult.exitCode}\n${ldResult.stdout}`,
+    );
 
     return results.join("\n\n");
   }
@@ -134,10 +140,10 @@ export class WpCliService {
   async healthCheck(target: ServerTarget): Promise<WpHealthCheck> {
     const host = this.getHost(target);
 
-    // 1. HTTP response check
+    // 1. HTTP response check (follow redirect, ignore self-signed SSL errors)
     const curlResult = await this.ssh.execute(
-      `curl -s -o /dev/null -w '{"http_status":%{http_code},"response_time_ms":%{time_total}}' --max-time 30 http://localhost`,
-      { host }
+      `curl -sL -k -o /dev/null -w '{"http_status":%{http_code},"response_time_ms":%{time_total}}' --max-time 30 http://localhost`,
+      { host },
     );
 
     let httpStatus = 0;
@@ -155,7 +161,7 @@ export class WpCliService {
     const logResult = await this.ssh.executeInContainer(
       this.containerName,
       "sh -c \"cat /var/www/html/wp-content/debug.log 2>/dev/null | tail -50 | grep -i 'Fatal error' || echo ''\"",
-      { host }
+      { host },
     );
     const hasFatalErrors = logResult.stdout.trim().length > 0;
     const fatalExcerpt = hasFatalErrors
@@ -166,8 +172,8 @@ export class WpCliService {
     const versionResult = await this.wp(target, "core version");
     const phpResult = await this.ssh.executeInContainer(
       this.containerName,
-      "php -r \"echo PHP_VERSION;\"",
-      { host }
+      'php -r "echo PHP_VERSION;"',
+      { host },
     );
 
     return {
@@ -187,17 +193,16 @@ export class WpCliService {
   async runBackup(
     target: ServerTarget,
     scope: "full" | "db" | "plugin",
-    pluginSlug?: string
+    pluginSlug?: string,
   ): Promise<string> {
     const host = this.getHost(target);
-    const args = scope === "plugin" && pluginSlug
-      ? `plugin ${pluginSlug}`
-      : scope;
+    const args =
+      scope === "plugin" && pluginSlug ? `plugin ${pluginSlug}` : scope;
 
     const result = await this.ssh.executeInContainer(
       this.containerName,
       `sh /var/www/html/wp-content/../scripts/backup.sh ${args}`,
-      { host, timeoutMs: 300_000 }
+      { host, timeoutMs: 300_000 },
     );
     if (result.exitCode !== 0) {
       throw new Error(`Backup failed: ${result.stderr}\n${result.stdout}`);
@@ -209,13 +214,13 @@ export class WpCliService {
   async runRestore(
     target: ServerTarget,
     backupId: string,
-    scope: "full" | "db" | "plugins" = "full"
+    scope: "full" | "db" | "plugins" = "full",
   ): Promise<string> {
     const host = this.getHost(target);
     const result = await this.ssh.executeInContainer(
       this.containerName,
       `sh /var/www/html/wp-content/../scripts/restore.sh ${backupId} ${scope}`,
-      { host, timeoutMs: 300_000 }
+      { host, timeoutMs: 300_000 },
     );
     if (result.exitCode !== 0) {
       throw new Error(`Restore failed: ${result.stderr}\n${result.stdout}`);

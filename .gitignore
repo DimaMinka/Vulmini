@@ -1,0 +1,47 @@
+# ==========================================
+# VULMINI .gitignore
+# ==========================================
+
+# WordPress core — скачивается динамически через WP-CLI
+wordpress-core/*
+!wordpress-core/.gitkeep
+
+# Секреты
+.env
+*.env.local
+
+# Данные Docker volumes
+volumes/
+
+# Бэкапы
+backups/
+*.sql
+*.sql.gz
+*.tar.gz
+
+# MCP-сервер
+mcp-server/node_modules/
+mcp-server/dist/
+mcp-server/.env
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Логи
+*.log
+logs/
+
+# SSL сертификаты (управляются Certbot)
+certs/
+
+# Antigravity CLI
+.antigravitycli/

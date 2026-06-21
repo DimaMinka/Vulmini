@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulmini Ecosystem Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        .gradient-text { background: linear-gradient(to right, #818cf8, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen selection:bg-indigo-500 selection:text-white">
+
+    <header class="relative border-b border-slate-800/80 bg-slate-900/40 py-16 overflow-hidden">
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.1),transparent_50%)]"></div>
+        <div class="max-w-6xl mx-auto px-6 relative z-10">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold mb-6 tracking-widest uppercase">
+                Deployed Status • Active
+            </div>
+            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-white mb-4">
+                <span class="gradient-text">Vulmini</span> Ecosystem
+            </h1>
+            <p class="text-lg text-slate-400 max-w-3xl leading-relaxed">
+                AI-managed WordPress infrastructure on Vultr VPS. Employs a <i>Twin-Instance</i> model (parallel staging) for safe, autonomous updates and data migrations.
+            </p>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6 py-12 space-y-16">
+        
+        <section>
+            <div class="mb-8 border-b border-slate-800 pb-4">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <span class="text-indigo-400 code-font text-xl">01</span> Docker Stack Configuration
+                </h2>
+                <p class="text-slate-400 text-sm mt-2">High-performance 6-container stack optimized for Vultr NVMe drives.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/30 transition">
+                    <div class="text-indigo-400 font-bold code-font mb-2">vulmini_app</div>
+                    <h3 class="text-white font-semibold mb-1">WordPress 6.7 + PHP 8.3</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">System core. Built-in WP-Cron disabled, Redis Object Cache integrated.</p>
+                </div>
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500/30 transition">
+                    <div class="text-blue-400 font-bold code-font mb-2">vulmini_db</div>
+                    <h3 class="text-white font-semibold mb-1">MariaDB 11.4</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">InnoDB settings (flush-method, buffer pool) strictly tuned for NVMe drives.</p>
+                </div>
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/30 transition relative overflow-hidden">
+                    <div class="text-amber-400 font-bold code-font mb-2">vulmini_cron</div>
+                    <h3 class="text-white font-semibold mb-1">Dedicated Scheduler</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">Dedicated PHP container running cron every minute to offload processing tasks from the web server.</p>
+                </div>
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-red-500/30 transition">
+                    <div class="text-red-400 font-bold code-font mb-2">vulmini_cache</div>
+                    <h3 class="text-white font-semibold mb-1">Redis 7.2</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">Object caching engine configured to cache database queries and transient records.</p>
+                </div>
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/30 transition">
+                    <div class="text-emerald-400 font-bold code-font mb-2">vulmini_web</div>
+                    <h3 class="text-white font-semibold mb-1">Nginx 1.27</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">Custom FastCGI caching rules and instantaneous static asset delivery.</p>
+                </div>
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-cyan-500/30 transition">
+                    <div class="text-cyan-400 font-bold code-font mb-2">vulmini_certbot</div>
+                    <h3 class="text-white font-semibold mb-1">Let's Encrypt</h3>
+                    <p class="text-xs text-slate-400 leading-relaxed">Automated SSL certificate rotation for secure, encrypted connections.</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="mb-8 border-b border-slate-800 pb-4">
+                <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                    <span class="text-emerald-400 code-font text-xl">02</span> Vulmini MCP Server (TypeScript)
+                </h2>
+                <p class="text-slate-400 text-sm mt-2">Model Context Protocol (MCP) interface providing the AI agent with tools for server management.</p>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-8 flex flex-col md:flex-row gap-6 items-center">
+                <div class="flex-1 space-y-4">
+                    <h3 class="text-lg font-bold text-white">Core Services</h3>
+                    <ul class="space-y-3">
+                        <li class="flex gap-3 items-start"><span class="text-emerald-400 font-bold mt-0.5">✓</span> <div><span class="code-font text-sm text-emerald-300">VultrApiClient</span> <p class="text-xs text-slate-400 mt-1">API v2: VPS management, snapshot polling, Object Storage control.</p></div></li>
+                        <li class="flex gap-3 items-start"><span class="text-emerald-400 font-bold mt-0.5">✓</span> <div><span class="code-font text-sm text-emerald-300">SshExecutor</span> <p class="text-xs text-slate-400 mt-1">SSH: Command execution inside Docker on remote servers.</p></div></li>
+                        <li class="flex gap-3 items-start"><span class="text-emerald-400 font-bold mt-0.5">✓</span> <div><span class="code-font text-sm text-emerald-300">WpCliService</span> <p class="text-xs text-slate-400 mt-1">WP-CLI: Wrapper for commands inside the vulmini_app container.</p></div></li>
+                    </ul>
+                </div>
+                <div class="md:w-1/3 bg-slate-950 rounded-xl p-4 border border-slate-800 text-center">
+                    <div class="text-4xl font-black text-slate-800 mb-2">13</div>
+                    <div class="text-xs text-slate-400 uppercase tracking-widest font-bold">Registered<br>AI Tools</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                    <div class="bg-indigo-950/40 px-4 py-3 border-b border-slate-800">
+                        <h4 class="font-bold text-indigo-300 text-sm">☁️ Vultr VPS Tools</h4>
+                    </div>
+                    <div class="p-4">
+                        <ul class="space-y-2 text-sm code-font text-slate-300">
+                            <li><span class="text-indigo-400">list_instances</span></li>
+                            <li><span class="text-indigo-400">get_instance_status</span></li>
+                            <li><span class="text-indigo-400">create_snapshot</span></li>
+                            <li><span class="text-indigo-400">get_snapshot_status</span></li>
+                            <li class="text-xs mt-2 pt-2 border-t border-slate-800/50 flex flex-col gap-1">
+                                <span class="text-indigo-300 font-bold">create_ephemeral_staging</span>
+                                <span class="text-slate-500 font-sans">Deploy production clone</span>
+                            </li>
+                            <li class="text-xs flex flex-col gap-1">
+                                <span class="text-red-300 font-bold">destroy_ephemeral_staging</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                    <div class="bg-emerald-950/40 px-4 py-3 border-b border-slate-800">
+                        <h4 class="font-bold text-emerald-300 text-sm">⚙️ WP-CLI Tools</h4>
+                    </div>
+                    <div class="p-4">
+                        <ul class="space-y-2 text-sm code-font text-slate-300">
+                            <li><span class="text-emerald-400">wp_plugin_status</span></li>
+                            <li><span class="text-emerald-400">wp_run_update</span></li>
+                            <li class="relative"><span class="text-amber-400">wp_db_migrate</span> <span class="absolute -right-2 top-0 flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span></span></li>
+                            <li><span class="text-emerald-400">wp_health_check</span></li>
+                            <li><span class="text-emerald-400">wp_run_backup</span></li>
+                            <li><span class="text-emerald-400">wp_run_restore</span></li>
+                            <li><span class="text-emerald-400">set_staging_host</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+                    <div class="bg-cyan-950/40 px-4 py-3 border-b border-slate-800">
+                        <h4 class="font-bold text-cyan-300 text-sm">📊 Telemetry Tools</h4>
+                    </div>
+                    <div class="p-4">
+                        <ul class="space-y-2 text-sm code-font text-slate-300">
+                            <li><span class="text-cyan-400">get_system_health</span></li>
+                            <li><span class="text-cyan-400">fetch_error_logs</span></li>
+                            <li><span class="text-cyan-400">fetch_nginx_logs</span></li>
+                            <li><span class="text-cyan-400">get_docker_status</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <h3 class="text-xl font-bold text-white mb-2 text-amber-400">System Scripts & Configurations</h3>
+                    <p class="text-sm text-slate-400 max-w-xl">
+                        Configured bash scripts <code class="code-font text-slate-300 text-xs">backup.sh</code> and <code class="code-font text-slate-300 text-xs">restore.sh</code> for emergency rollbacks. 
+                        Tuned PHP-FPM pools (<code class="code-font text-slate-300 text-xs">php/pool.conf</code>) and web server caching rules (<code class="code-font text-slate-300 text-xs">nginx/default.conf</code>).
+                    </p>
+                </div>
+                <div class="flex gap-2">
+                    <div class="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-bold text-slate-400 code-font">bash</div>
+                    <div class="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-bold text-slate-400 code-font">nginx</div>
+                    <div class="px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-bold text-slate-400 code-font">php-fpm</div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="border-t border-slate-900 bg-slate-950 py-8 text-center text-xs text-slate-500 code-font">
+        Vulmini Infrastructure • v0.0.1-beta • Generated by AI Coding Partner
+    </footer>
+
+</body>
+</html>

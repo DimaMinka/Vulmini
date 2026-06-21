@@ -1,0 +1,217 @@
+# ==========================================
+# VULMINI — Production Docker Compose
+# ==========================================
+# Стек: Nginx + PHP-FPM 8.3 + MariaDB 11.4 + Redis 7.2
+# Оптимизирован под Vultr High-Frequency (Tel-Aviv)
+# Домен: vulmini.wl.mk | SSL: Let's Encrypt
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── 1. MariaDB — Тюнинг под Vultr HF NVMe ──
+  vulmini_db:
+    image: mariadb:11.4
+    container_name: vulmini_db
+    restart: always
+    command:
+      - "--innodb-flush-method=O_DIRECT"
+      - "--innodb-buffer-pool-size=1G"
+      - "--innodb-log-file-size=256M"
+      - "--innodb-flush-log-at-trx-commit=2"
+      - "--innodb-flush-neighbors=0"
+      - "--innodb-io-capacity=2000"
+      - "--innodb-io-capacity-max=4000"
+      - "--max-connections=150"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+      - "--skip-name-resolve"
+      - "--slow-query-log=1"
+      - "--long-query-time=2"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+    networks:
+      - vulmini_net
+
+  # ── 2. Redis — Объектный кэш для LearnDash ──
+  vulmini_cache:
+    image: redis:7.2-alpine
+    container_name: vulmini_cache
+    restart: always
+    command:
+      - "redis-server"
+      - "--maxmemory"
+      - "256mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+      - "--save"
+      - ""
+      - "--appendonly"
+      - "no"
+      - "--tcp-backlog"
+      - "4096"
+      - "--loglevel"
+      - "warning"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    networks:
+      - vulmini_net
+
+  # ── 3. PHP-FPM + WordPress — Вычислительный узел ──
+  vulmini_app:
+    image: wordpress:6.7-php8.3-fpm-alpine
+    container_name: vulmini_app
+    restart: always
+    depends_on:
+      vulmini_db:
+        condition: service_healthy
+      vulmini_cache:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: vulmini_db:3306
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_CONFIG_EXTRA: |
+        /* Redis Object Cache */
+        define('WP_REDIS_HOST', 'vulmini_cache');
+        define('WP_REDIS_PORT', 6379);
+        define('WP_REDIS_PREFIX', 'vulmini_');
+        define('WP_CACHE', true);
+        /* Cron handled by vulmini_cron container */
+        define('DISABLE_WP_CRON', true);
+        /* Performance */
+        define('WP_POST_REVISIONS', 5);
+        define('AUTOSAVE_INTERVAL', 120);
+        define('EMPTY_TRASH_DAYS', 14);
+        /* LearnDash */
+        define('LEARNDASH_LMS_DEFAULT_DATA_UPGRADE_BATCH_SIZE', 1000);
+    volumes:
+      - ./wordpress-core:/var/www/html
+      - ./wp-content:/var/www/html/wp-content
+      - ./php/pool.conf:/usr/local/etc/php-fpm.d/zzz-custom.conf:ro
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - vulmini_net
+
+  # ── 4. WP-Cron — Изолированный для LearnDash ──
+  # Рассылки, scheduled quizzes, drip content
+  vulmini_cron:
+    image: wordpress:6.7-php8.3-fpm-alpine
+    container_name: vulmini_cron
+    restart: always
+    depends_on:
+      vulmini_db:
+        condition: service_healthy
+      vulmini_cache:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: vulmini_db:3306
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_REDIS_HOST', 'vulmini_cache');
+        define('WP_REDIS_PORT', 6379);
+        define('WP_REDIS_PREFIX', 'vulmini_');
+        define('WP_CACHE', true);
+        define('DISABLE_WP_CRON', true);
+    volumes:
+      - ./wordpress-core:/var/www/html
+      - ./wp-content:/var/www/html/wp-content
+    entrypoint: /bin/sh
+    command: ["-c", "while true; do php /var/www/html/wp-cron.php; sleep 60; done"]
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - vulmini_net
+
+  # ── 5. Nginx — Веб-сервер + FastCGI кэш ──
+  vulmini_web:
+    image: nginx:1.27-alpine
+    container_name: vulmini_web
+    restart: always
+    depends_on:
+      - vulmini_app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./wordpress-core:/var/www/html:ro
+      - ./wp-content:/var/www/html/wp-content:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot_etc:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+      - nginx_cache:/var/cache/nginx
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - vulmini_net
+
+  # ── 6. Certbot — Let's Encrypt для vulmini.wl.mk ──
+  vulmini_certbot:
+    image: certbot/certbot
+    container_name: vulmini_certbot
+    volumes:
+      - certbot_etc:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'"
+    logging: *default-logging
+    networks:
+      - vulmini_net
+
+volumes:
+  db_data:
+    driver: local
+  certbot_etc:
+    driver: local
+  certbot_www:
+    driver: local
+  nginx_cache:
+    driver: local
+
+networks:
+  vulmini_net:
+    driver: bridge

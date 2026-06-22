@@ -45,3 +45,9 @@ certs/
 
 # Antigravity CLI
 .antigravitycli/
+
+# Временные файлы разработки и логи агентов
+.agents/
+ORIGINAL_REQUEST.md
+TEST_READY.md
+

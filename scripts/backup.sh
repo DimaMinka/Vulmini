@@ -2,13 +2,13 @@
 # ==========================================
 # VULMINI — Backup Script
 # ==========================================
-# Быстрый точечный бэкап БД и плагинов.
-# Вызывается Gemini через MCP перед обновлениями на проде.
+# Fast selective backup of DB and plugins.
+# Triggered by Gemini via MCP before updates on production.
 #
-# Использование:
-#   ./backup.sh full          — БД + все плагины
-#   ./backup.sh db            — только БД
-#   ./backup.sh plugin <slug> — конкретный плагин
+# Usage:
+#   ./backup.sh full          - DB + all plugins
+#   ./backup.sh db            - DB only
+#   ./backup.sh plugin <slug> - specific plugin
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ BACKUP_DIR="/var/www/html/wp-content/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 MAX_BACKUPS=5
 
-# Создаём папку бэкапов
+# Create backups directory
 mkdir -p "$BACKUP_DIR"
 
 backup_db() {
@@ -48,7 +48,7 @@ rotate_backups() {
     ls -t "$BACKUP_DIR"/plugins_*.tar.gz 2>/dev/null | tail -n +$((MAX_BACKUPS + 1)) | xargs -r rm
 }
 
-# ── Main ──
+# -- Main --
 case "${1:-full}" in
     full)
         DB_FILE=$(backup_db)

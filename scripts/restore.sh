@@ -2,13 +2,13 @@
 # ==========================================
 # VULMINI — Restore Script
 # ==========================================
-# Аварийное восстановление из бэкапа.
-# Вызывается Gemini через MCP при ошибке обновления на проде.
+# Emergency recovery from backup.
+# Triggered by Gemini via MCP on update failure on production.
 #
-# Использование:
-#   ./restore.sh <backup_id>     — полное восстановление (БД + плагины)
-#   ./restore.sh <backup_id> db  — только БД
-#   ./restore.sh <backup_id> plugins — только плагины
+# Usage:
+#   ./restore.sh <backup_id>         - full recovery (DB + plugins)
+#   ./restore.sh <backup_id> db      - DB only
+#   ./restore.sh <backup_id> plugins - plugins only
 
 set -euo pipefail
 
@@ -55,7 +55,7 @@ flush_caches() {
     echo "[Vulmini Restore] ✅ Caches flushed"
 }
 
-# ── Main ──
+# -- Main --
 echo "[Vulmini Restore] Starting restore from backup: $BACKUP_ID (scope: $SCOPE)"
 
 case "$SCOPE" in

@@ -149,7 +149,8 @@ registerTelemetryTools(server, ssh, (target) => {
 
 // ── Connect Server ──
 
-const useHttp = process.env.TRANSPORT === "http" || process.argv.includes("--http");
+const useHttp =
+  process.env.TRANSPORT === "http" || process.argv.includes("--http");
 
 if (useHttp) {
   console.error("[Vulmini] 🚀 Starting MCP server in HTTP mode...");
@@ -157,7 +158,11 @@ if (useHttp) {
   app.use(express.json());
 
   // Timing-safe Bearer Authentication Middleware
-  const authenticate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authenticate = (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       res.status(401).json({ error: "Unauthorized" });
@@ -166,7 +171,9 @@ if (useHttp) {
     const token = authHeader.substring(7);
     const expectedToken = process.env.MCP_BEARER_TOKEN;
     if (!expectedToken) {
-      console.error("[Vulmini] ❌ MCP_BEARER_TOKEN is not configured in environment");
+      console.error(
+        "[Vulmini] ❌ MCP_BEARER_TOKEN is not configured in environment",
+      );
       res.status(500).json({ error: "Server Configuration Error" });
       return;
     }
@@ -191,9 +198,13 @@ if (useHttp) {
   const transport = new StreamableHTTPServerTransport();
   await server.connect(transport);
 
-  app.all("/mcp", authenticate, async (req: express.Request, res: express.Response) => {
-    await transport.handleRequest(req, res, req.body);
-  });
+  app.all(
+    "/mcp",
+    authenticate,
+    async (req: express.Request, res: express.Response) => {
+      await transport.handleRequest(req, res, req.body);
+    },
+  );
 
   app.get("/health", (req: express.Request, res: express.Response) => {
     res.status(200).json({ status: "healthy" });

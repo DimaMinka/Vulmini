@@ -1,5 +1,7 @@
 # Vulmini Ecosystem
 
+[![VibeTalent Badge](https://www.vibetalent.work/api/badge/dimaminka)](https://www.vibetalent.work/profile/dimaminka)
+
 AI-managed WordPress infrastructure on Vultr VPS. Employs a **Twin-Instance** model (parallel staging) for safe, autonomous updates, testing, and data migrations.
 
 ---

@@ -210,6 +210,11 @@ if (useHttp) {
     res.status(200).json({ status: "healthy" });
   });
 
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("[Vulmini] ❌ Route error:", err);
+    res.status(500).json({ error: err.message || "Internal Server Error" });
+  });
+
   const port = parseInt(process.env.PORT || "3000", 10);
   app.listen(port, () => {
     console.error(`[Vulmini] ✅ MCP HTTP server listening on port ${port}`);

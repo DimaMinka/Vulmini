@@ -211,6 +211,39 @@ services:
     networks:
       - vulmini_net
 
+  # ── 7. Vulmini MCP Server ──
+  vulmini_mcp:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: vulmini_mcp
+    restart: always
+    environment:
+      TRANSPORT: "http"
+      PORT: 3000
+      VULTR_API_KEY: ${VULTR_API_KEY}
+      VULTR_REGION: ${VULTR_REGION}
+      VULTR_PLAN: ${VULTR_PLAN}
+      SSH_HOST: ${SSH_HOST}
+      SSH_PORT: ${SSH_PORT}
+      SSH_USER: ${SSH_USER}
+      SSH_PRIVATE_KEY_PATH: /etc/ssh/keys/vulmini_rsa
+      MCP_BEARER_TOKEN: ${MCP_BEARER_TOKEN}
+    volumes:
+      - ${SSH_PRIVATE_KEY_PATH:-~/.ssh/id_rsa}:/etc/ssh/keys/vulmini_rsa:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - vulmini_net
+
 volumes:
   db_data:
     driver: local

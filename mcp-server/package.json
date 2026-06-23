@@ -12,7 +12,13 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
-    "test:e2e": "NODE_PATH=$(pwd)/node_modules tsx ../tests/run.ts"
+    "test:e2e": "NODE_PATH=$(pwd)/node_modules tsx ../tests/run.ts",
+    "mcp:up": "node remote-up.js mcp",
+    "mcp:down": "node remote-down.js mcp",
+    "stage:up": "node remote-up.js stage",
+    "stage:down": "node remote-down.js stage",
+    "prod:up": "node remote-up.js prod",
+    "prod:down": "node remote-down.js prod"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

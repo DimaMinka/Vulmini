@@ -4,8 +4,11 @@ import path from 'path';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Read .env
-const envPath = path.resolve('../.env');
+const envPath = path.resolve(__dirname, '../.env');
 const envContent = fs.readFileSync(envPath, 'utf-8');
 
 function getEnvVal(name) {
@@ -13,27 +16,55 @@ function getEnvVal(name) {
   return match ? match[1].trim() : null;
 }
 
-const sshHost = getEnvVal("SSH_HOST");
+// ── Target Configuration ──
+const target = process.argv[2] || 'mcp';
+if (!['mcp', 'stage', 'prod'].includes(target)) {
+  console.error(`❌ Invalid target: ${target}. Must be mcp, stage, or prod.`);
+  process.exit(1);
+}
+
+let hostVar = '';
+let dockerComposeServices = '';
+
+switch (target) {
+  case 'mcp':
+    hostVar = 'VULTR_MCP_HOST';
+    // Spin up only the web server proxy and the MCP server
+    dockerComposeServices = 'vulmini_web vulmini_mcp';
+    break;
+  case 'stage':
+    hostVar = 'VULMINI_STAGING_HOST';
+    // Spin up staging wordpress services (db, redis, app, cron, nginx, certbot)
+    dockerComposeServices = 'vulmini_db vulmini_cache vulmini_app vulmini_cron vulmini_web vulmini_certbot';
+    break;
+  case 'prod':
+    hostVar = 'SSH_HOST';
+    // Spin up production wordpress services
+    dockerComposeServices = 'vulmini_db vulmini_cache vulmini_app vulmini_cron vulmini_web vulmini_certbot';
+    break;
+}
+
+const sshHost = getEnvVal(hostVar);
 const sshPort = parseInt(getEnvVal("SSH_PORT") || "22", 10);
 const sshUser = getEnvVal("SSH_USER") || "root";
 const sshKeyPathRaw = getEnvVal("SSH_PRIVATE_KEY_PATH") || "~/.ssh/vulmini_rsa";
 const sshKeyPath = sshKeyPathRaw.replace(/^~/, process.env.HOME || '');
 
 if (!sshHost) {
-  console.error("SSH_HOST not found in .env. Please run deploy-vps.js first.");
+  console.error(`❌ SSH Host variable ${hostVar} not found/empty in .env. Please run deploy-vps.js first.`);
   process.exit(1);
 }
 
 const privateKey = fs.readFileSync(sshKeyPath);
 
-console.log(`Target VPS: ${sshUser}@${sshHost}:${sshPort}`);
+console.log(`\nTarget VPS (${target}): ${sshUser}@${sshHost}:${sshPort}`);
 
 // 1. Pack project files locally
 console.log("1. Packaging project files locally...");
 const tarFile = 'vulmini.tar.gz';
 try {
   // Go to root folder and tar essential files
-  execSync(`tar -czf ${tarFile} -C .. docker-compose.yml .env nginx php scripts`, { stdio: 'inherit' });
+  execSync(`tar -czf ${tarFile} -C .. --exclude=mcp-server/node_modules --exclude=mcp-server/dist docker-compose.yml .env nginx php scripts mcp-server`, { stdio: 'inherit' });
   console.log("Files packaged successfully.");
 } catch (err) {
   console.error("Failed to package files:", err);
@@ -97,8 +128,10 @@ conn.on('ready', async () => {
     await executeRemoteCommand(conn, "mkdir -p /root/vulmini && tar -xzf /root/vulmini.tar.gz -C /root/vulmini");
 
     // 5. Run Docker Compose
-    console.log("4. Running Docker Compose up...");
-    await executeRemoteCommand(conn, "cd /root/vulmini && docker compose down && docker compose up -d");
+    console.log(`4. Running Docker Compose up for target services: ${dockerComposeServices}...`);
+    // Stop all running services in directory first to prevent conflicts, then start specific services
+    await executeRemoteCommand(conn, "cd /root/vulmini && docker compose down");
+    await executeRemoteCommand(conn, `cd /root/vulmini && docker compose up -d ${dockerComposeServices}`);
 
     console.log("\n🎉 Docker Stack is booting up on Vultr VPS!");
     console.log("Checking container status in 10 seconds...");
@@ -107,21 +140,42 @@ conn.on('ready', async () => {
       await executeRemoteCommand(conn, "docker ps");
       conn.end();
       // Delete local tarball
-      fs.unlinkSync(tarFile);
+      if (fs.existsSync(tarFile)) fs.unlinkSync(tarFile);
       console.log("\nDone!");
     }, 10000);
 
   } catch (err) {
-    console.error("Error during remote execution:", err);
+    console.error("❌ Error during remote execution:", err);
     conn.end();
     if (fs.existsSync(tarFile)) fs.unlinkSync(tarFile);
+    process.exit(1);
   }
-}).on('error', (err) => {
-  console.error("SSH Connection Error:", err);
-}).connect({
-  host: sshHost,
-  port: sshPort,
-  username: sshUser,
-  privateKey: privateKey,
-  readyTimeout: 60000
 });
+
+let connectionAttempts = 0;
+const maxAttempts = 15;
+
+function startSshConnection() {
+  connectionAttempts++;
+  console.log(`Connecting to SSH (Attempt ${connectionAttempts}/${maxAttempts})...`);
+  conn.connect({
+    host: sshHost,
+    port: sshPort,
+    username: sshUser,
+    privateKey: privateKey,
+    readyTimeout: 60000
+  });
+}
+
+conn.on('error', (err) => {
+  console.error(`❌ SSH Connection Error (Attempt ${connectionAttempts}/${maxAttempts}):`, err.message || err);
+  if (connectionAttempts < maxAttempts && (err.code === 'ECONNREFUSED' || err.level === 'client-timeout' || err.code === 'ETIMEDOUT')) {
+    console.log("Waiting 10 seconds before retrying...");
+    setTimeout(startSshConnection, 10000);
+  } else {
+    if (fs.existsSync(tarFile)) fs.unlinkSync(tarFile);
+    process.exit(1);
+  }
+});
+
+startSshConnection();

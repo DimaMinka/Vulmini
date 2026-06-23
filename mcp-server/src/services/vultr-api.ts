@@ -129,13 +129,19 @@ export class VultrApiClient {
     maxAttempts = 60,
   ): Promise<VultrInstance> {
     for (let i = 0; i < maxAttempts; i++) {
-      const instance = await this.getInstance(instanceId);
-      if (instance.status === "active" && instance.power_status === "running") {
-        return instance;
+      try {
+        const instance = await this.getInstance(instanceId);
+        if (instance.status === "active" && instance.power_status === "running") {
+          return instance;
+        }
+        console.error(
+          `[Vulmini] Instance ${instanceId}: status=${instance.status}, power=${instance.power_status} (attempt ${i + 1}/${maxAttempts})`,
+        );
+      } catch (err: any) {
+        console.error(
+          `[Vulmini] Instance ${instanceId}: fetch error during status check (attempt ${i + 1}/${maxAttempts}): ${err.message || err}`,
+        );
       }
-      console.error(
-        `[Vulmini] Instance ${instanceId}: status=${instance.status}, power=${instance.power_status} (attempt ${i + 1}/${maxAttempts})`,
-      );
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
     throw new Error(

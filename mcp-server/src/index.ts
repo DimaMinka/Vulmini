@@ -12,8 +12,8 @@
 //   npx @modelcontextprotocol/inspector node dist/index.js — debug
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import express from "express";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -149,10 +149,11 @@ registerTelemetryTools(server, ssh, (target) => {
 
 // ── Connect Server ──
 
-const useHttp =
-  process.env.TRANSPORT === "http" || process.argv.includes("--http");
+// ── Connect Server ──
 
-if (useHttp) {
+const transportMode = process.env.MCP_TRANSPORT || (process.env.PORT ? "http" : "stdio");
+
+if (transportMode === "http") {
   console.error("[Vulmini] 🚀 Starting MCP server in HTTP mode...");
   const app = express();
   app.use(express.json());
@@ -195,7 +196,12 @@ if (useHttp) {
     next();
   };
 
-  const transport = new StreamableHTTPServerTransport();
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => crypto.randomUUID()
+  });
+  transport.onerror = (err) => {
+    console.error("[Vulmini] ❌ Transport error:", err);
+  };
   await server.connect(transport);
 
   app.all(
@@ -221,12 +227,6 @@ if (useHttp) {
   });
 } else {
   console.error("[Vulmini] 🚀 Starting MCP server in Stdio mode...");
-  console.error(`[Vulmini]   Region: ${vultrRegion}`);
-  console.error(`[Vulmini]   Plan: ${vultrPlan}`);
-  console.error(`[Vulmini]   SSH: ${sshUser}@${sshHost}:${sshPort}`);
-
   const transport = new StdioServerTransport();
   await server.connect(transport);
-
-  console.error("[Vulmini] ✅ MCP server connected and ready via stdio");
 }

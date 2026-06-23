@@ -217,12 +217,10 @@ if (transportMode === "http") {
         sessionIdGenerator: () => sessionId,
       });
 
-      // Force the transport to be marked as initialized with the correct session ID.
-      // This allows clients to reconnect seamlessly without throwing 404/400 errors after server restarts.
+      // Force the transport to have the correct session ID.
       const webTransport = (transport as any)._webStandardTransport;
       if (webTransport) {
         webTransport.sessionId = sessionId;
-        webTransport._initialized = true;
       }
 
       transport.onerror = (err) => {

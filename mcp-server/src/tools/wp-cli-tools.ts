@@ -7,6 +7,22 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { WpCliService } from "../services/wp-cli.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+function getEnvPath(dirname: string): string {
+  const paths = [
+    path.resolve(dirname, "../../../.env"), // dev src/tools/../../..
+    path.resolve(dirname, "../../.env"),    // prod dist/tools/../..
+    path.resolve(dirname, "../../../../.env"),
+    path.resolve(dirname, ".env")
+  ];
+  for (const p of paths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return paths[0];
+}
 
 const targetSchema = z
   .enum(["production", "staging"])
@@ -279,17 +295,39 @@ export function registerWpCliTools(
   // ── set_staging_host ──
   server.tool(
     "set_staging_host",
-    "Set the SSH host for the staging server. Call this after create_ephemeral_staging returns an IP address, so that WP-CLI tools can target the staging server.",
+    "Set the SSH host for the staging server. Call this after create_ephemeral_staging returns an IP address, so that WP-CLI and telemetry tools can target the staging server.",
     {
       host: z.string().ip().describe("IP address of the staging VPS"),
     },
     async ({ host }) => {
+      // 1. Update in-memory WpCliService
       wpCli.setStagingHost(host);
+      
+      // 2. Update process.env for telemetry tools
+      process.env.VULMINI_STAGING_HOST = host;
+
+      // 3. Write back to .env file so it persists across restarts
+      try {
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
+        const envPath = getEnvPath(__dirname);
+        if (fs.existsSync(envPath)) {
+          let envContent = fs.readFileSync(envPath, "utf-8");
+          if (envContent.includes("VULMINI_STAGING_HOST=")) {
+            envContent = envContent.replace(/VULMINI_STAGING_HOST=[^\r\n]*/, `VULMINI_STAGING_HOST=${host}`);
+          } else {
+            envContent += `\nVULMINI_STAGING_HOST=${host}\n`;
+          }
+          fs.writeFileSync(envPath, envContent, "utf-8");
+        }
+      } catch (err) {
+        console.error("[Vulmini] Failed to write staging host to .env file:", err);
+      }
+
       return {
         content: [
           {
             type: "text",
-            text: `Staging host set to ${host}. WP-CLI tools can now target 'staging'.`,
+            text: `Staging host set to ${host}. WP-CLI and telemetry tools can now target 'staging'.`,
           },
         ],
       };

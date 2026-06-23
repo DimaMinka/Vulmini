@@ -12,6 +12,19 @@ import path from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
+function getEnvPath(dirname: string): string {
+  const paths = [
+    path.resolve(dirname, "../../../.env"), // dev src/tools/../../..
+    path.resolve(dirname, "../../.env"),    // prod dist/tools/../..
+    path.resolve(dirname, "../../../../.env"),
+    path.resolve(dirname, ".env")
+  ];
+  for (const p of paths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return paths[0];
+}
+
 export function registerVultrTools(
   server: McpServer,
   vultr: VultrApiClient,
@@ -318,7 +331,7 @@ export function registerVultrTools(
     async () => {
       try {
         const __dirname = path.dirname(fileURLToPath(import.meta.url));
-        const envPath = path.resolve(__dirname, "../../../.env");
+        const envPath = getEnvPath(__dirname);
         let envContent = "";
         try {
           envContent = fs.readFileSync(envPath, "utf-8");
@@ -443,7 +456,7 @@ export function registerVultrTools(
     async () => {
       try {
         const __dirname = path.dirname(fileURLToPath(import.meta.url));
-        const envPath = path.resolve(__dirname, "../../../.env");
+        const envPath = getEnvPath(__dirname);
         let envContent = "";
         try {
           envContent = fs.readFileSync(envPath, "utf-8");
@@ -503,10 +516,13 @@ export function registerVultrTools(
           sshKeyId = newKey.ssh_key.id;
         }
 
+        const stagePlan = getEnvVal("VULTR_STAGE_PLAN") || defaultConfig.plan;
+        const stageRegion = getEnvVal("VULTR_STAGE_REGION") || "lhr";
+
         // 2. Create Instance
         const instance = await vultr.createInstance({
-          region: defaultConfig.region,
-          plan: defaultConfig.plan,
+          region: stageRegion,
+          plan: stagePlan,
           os_id: 2284, // Ubuntu 24.04
           label: "vulmini-stage",
           hostname: "vulmini-stage",

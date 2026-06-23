@@ -130,6 +130,28 @@ conn.on('ready', async () => {
     const remoteTar = '/root/vulmini-mcp.tar.gz';
     await uploadFile(conn, path.join(__dirname, tarFile), remoteTar);
 
+    // 3.1. Upload SSH Key for accessing staging/production VPS
+    console.log("3.1. Uploading SSH private and public keys to remote server...");
+    await executeRemoteCommand(conn, "mkdir -p /root/.ssh && chmod 700 /root/.ssh");
+    const remoteKeyPath = '/root/.ssh/vulmini_rsa';
+    const remotePubKeyPath = '/root/.ssh/vulmini_rsa.pub';
+    if (fs.existsSync(sshKeyPath)) {
+      await uploadFile(conn, sshKeyPath, remoteKeyPath);
+      await executeRemoteCommand(conn, `chmod 600 ${remoteKeyPath}`);
+      console.log("SSH private key uploaded and secured.");
+    } else {
+      console.warn(`⚠️ Warning: Local SSH private key not found at ${sshKeyPath}. Skipping private key upload.`);
+    }
+    const pubKeyPath = sshKeyPath + '.pub';
+    if (fs.existsSync(pubKeyPath)) {
+      await uploadFile(conn, pubKeyPath, remotePubKeyPath);
+      await executeRemoteCommand(conn, `chmod 644 ${remotePubKeyPath}`);
+      console.log("SSH public key uploaded and secured.");
+    } else {
+      console.warn(`⚠️ Warning: Local SSH public key not found at ${pubKeyPath}. Skipping public key upload.`);
+    }
+
+
     // 4. Extract tarball
     console.log("3. Extracting files to /var/www/vulmini-mcp...");
     await executeRemoteCommand(conn, "mkdir -p /var/www/vulmini-mcp && tar -xzf /root/vulmini-mcp.tar.gz -C /var/www/vulmini-mcp");

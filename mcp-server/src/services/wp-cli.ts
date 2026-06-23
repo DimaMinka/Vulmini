@@ -62,7 +62,7 @@ export class WpCliService {
    * Execute a WP-CLI command on the target server.
    * Commands are run inside the vulmini_app Docker container.
    */
-  private async wp(
+  async runCommand(
     target: ServerTarget,
     command: string,
     timeoutMs?: number,
@@ -73,6 +73,18 @@ export class WpCliService {
       `wp ${command} --allow-root`,
       { host, timeoutMs },
     );
+  }
+
+  /**
+   * Execute a WP-CLI command on the target server.
+   * Commands are run inside the vulmini_app Docker container.
+   */
+  private async wp(
+    target: ServerTarget,
+    command: string,
+    timeoutMs?: number,
+  ): Promise<SshCommandResult> {
+    return this.runCommand(target, command, timeoutMs);
   }
 
   // ── Plugin Management ──

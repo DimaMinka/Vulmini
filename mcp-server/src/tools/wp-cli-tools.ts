@@ -339,4 +339,51 @@ export function registerWpCliTools(
       };
     },
   );
+
+  // ── wp_run_command ──
+  server.tool(
+    "wp_run_command",
+    "Execute any arbitrary WP-CLI command on the target server (e.g. 'plugin install classic-editor --activate'). Omit 'wp' prefix from command.",
+    {
+      target: targetSchema,
+      command: z
+        .string()
+        .describe(
+          "The WP-CLI command to run (e.g. 'plugin install classic-editor --activate')",
+        ),
+    },
+    async ({ target, command }) => {
+      try {
+        const result = await wpCli.runCommand(target, command);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  target,
+                  command,
+                  exit_code: result.exitCode,
+                  stdout: result.stdout,
+                  stderr: result.stderr,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `WP-CLI command failed on ${target}: ${error}`,
+            },
+          ],
+        };
+      }
+    },
+  );
 }

@@ -43,6 +43,18 @@ async function main() {
 
   transport.onerror = (error) => {
     console.error(`[Streamable HTTP Transport Error]:`, error);
+    // Exit if session is expired, not found, or connection failed, triggering Claude Desktop to restart the bridge
+    const msg = error.message || "";
+    if (
+      msg.includes("Session not found") || 
+      msg.includes("404") || 
+      msg.includes("Not Found") || 
+      msg.includes("Server not initialized") ||
+      msg.includes("reconnection attempts")
+    ) {
+      console.error("Session is invalid or lost. Exiting to trigger restart...");
+      process.exit(1);
+    }
   };
 
   transport.onclose = () => {

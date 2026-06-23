@@ -14,6 +14,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
 import express from "express";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -31,7 +34,10 @@ import { registerTelemetryTools } from "./tools/telemetry-tools.js";
 // ── Load Environment Variables from .env ──
 try {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const envPath = path.resolve(__dirname, "../../.env");
+  let envPath = path.resolve(__dirname, "../../.env");
+  if (!fs.existsSync(envPath)) {
+    envPath = path.resolve(__dirname, "../.env");
+  }
   if (fs.existsSync(envPath)) {
     const envContent = fs.readFileSync(envPath, "utf-8");
     envContent.split(/\r?\n/).forEach((line) => {
@@ -196,24 +202,121 @@ if (transportMode === "http") {
     next();
   };
 
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => crypto.randomUUID()
-  });
-  transport.onerror = (err) => {
-    console.error("[Vulmini] ❌ Transport error:", err);
+  // Map to store active sessions: sessionId -> { transport, server }
+  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer }>();
+
+  // Helper to construct a new server + transport session
+  const getOrCreateSession = async (sessionId: string) => {
+    let session = sessions.get(sessionId);
+    if (!session) {
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => sessionId
+      });
+
+      // Force the transport to be marked as initialized with the correct session ID.
+      // This allows clients to reconnect seamlessly without throwing 404/400 errors after server restarts.
+      const webTransport = (transport as any)._webStandardTransport;
+      if (webTransport) {
+        webTransport.sessionId = sessionId;
+        webTransport._initialized = true;
+      }
+
+      transport.onerror = (err) => {
+        console.error(`[Vulmini] ❌ Transport error for session ${sessionId}:`, err);
+      };
+      
+      const s = new McpServer({
+        name: "vulmini-mcp-server",
+        version: "0.1.0",
+      });
+      registerVultrTools(s, vultr, {
+        region: vultrRegion,
+        plan: vultrPlan,
+      });
+      registerWpCliTools(s, wpCli);
+      registerTelemetryTools(s, ssh, (target) => {
+        if (target === "staging") {
+          try {
+            const __dirname = path.dirname(fileURLToPath(import.meta.url));
+            const envPath = path.resolve(__dirname, "../../.env");
+            if (fs.existsSync(envPath)) {
+              const envContent = fs.readFileSync(envPath, "utf-8");
+              envContent.split(/\r?\n/).forEach((line) => {
+                const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+                if (match) {
+                  const key = match[1];
+                  let value = match[2] || "";
+                  if (value.startsWith('"') && value.endsWith('"')) {
+                    value = value.slice(1, -1);
+                  } else if (value.startsWith("'") && value.endsWith("'")) {
+                    value = value.slice(1, -1);
+                  }
+                  process.env[key] = value.trim();
+                }
+              });
+            }
+          } catch (e) {
+            console.error("[Vulmini] Error reloading .env file:", e);
+          }
+
+          const stagingHost = process.env.VULMINI_STAGING_HOST;
+          if (!stagingHost) {
+            throw new Error(
+              "Staging host not configured. Use set_staging_host tool first.",
+            );
+          }
+          return stagingHost;
+        }
+        return sshHost;
+      });
+
+      await s.connect(transport);
+      session = { transport, server: s };
+      sessions.set(sessionId, session);
+    }
+    return session;
   };
-  await server.connect(transport);
 
   app.all(
     "/mcp",
     authenticate,
     async (req: express.Request, res: express.Response) => {
-      await transport.handleRequest(req, res, req.body);
+      let sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+      // If it's a POST and has no session id, check if it's an initialize request
+      if (!sessionId && req.method === "POST" && req.body) {
+        const body = req.body;
+        const messages = Array.isArray(body) ? body : [body];
+        const isInit = messages.some(msg => msg && msg.method === "initialize");
+        if (isInit) {
+          sessionId = crypto.randomUUID();
+        }
+      }
+
+      if (!sessionId) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message: "Bad Request: Mcp-Session-Id header or initialize request is required"
+          },
+          id: null
+        });
+        return;
+      }
+
+      try {
+        const session = await getOrCreateSession(sessionId);
+        await session.transport.handleRequest(req, res, req.body);
+      } catch (err: any) {
+        console.error(`[Vulmini] ❌ Error handling request for session ${sessionId}:`, err);
+        res.status(500).json({ error: err.message || "Internal Server Error" });
+      }
     },
   );
 
   app.get("/health", (req: express.Request, res: express.Response) => {
-    res.status(200).json({ status: "healthy" });
+    res.status(200).json({ status: "healthy", activeSessions: sessions.size });
   });
 
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -230,3 +333,4 @@ if (transportMode === "http") {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
+

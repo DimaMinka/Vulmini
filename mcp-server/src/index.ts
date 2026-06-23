@@ -157,7 +157,8 @@ registerTelemetryTools(server, ssh, (target) => {
 
 // ── Connect Server ──
 
-const transportMode = process.env.MCP_TRANSPORT || (process.env.PORT ? "http" : "stdio");
+const transportMode =
+  process.env.MCP_TRANSPORT || (process.env.PORT ? "http" : "stdio");
 
 if (transportMode === "http") {
   console.error("[Vulmini] 🚀 Starting MCP server in HTTP mode...");
@@ -203,14 +204,17 @@ if (transportMode === "http") {
   };
 
   // Map to store active sessions: sessionId -> { transport, server }
-  const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer }>();
+  const sessions = new Map<
+    string,
+    { transport: StreamableHTTPServerTransport; server: McpServer }
+  >();
 
   // Helper to construct a new server + transport session
   const getOrCreateSession = async (sessionId: string) => {
     let session = sessions.get(sessionId);
     if (!session) {
       const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => sessionId
+        sessionIdGenerator: () => sessionId,
       });
 
       // Force the transport to be marked as initialized with the correct session ID.
@@ -222,9 +226,12 @@ if (transportMode === "http") {
       }
 
       transport.onerror = (err) => {
-        console.error(`[Vulmini] ❌ Transport error for session ${sessionId}:`, err);
+        console.error(
+          `[Vulmini] ❌ Transport error for session ${sessionId}:`,
+          err,
+        );
       };
-      
+
       const s = new McpServer({
         name: "vulmini-mcp-server",
         version: "0.1.0",
@@ -287,7 +294,9 @@ if (transportMode === "http") {
       if (!sessionId && req.method === "POST" && req.body) {
         const body = req.body;
         const messages = Array.isArray(body) ? body : [body];
-        const isInit = messages.some(msg => msg && msg.method === "initialize");
+        const isInit = messages.some(
+          (msg) => msg && msg.method === "initialize",
+        );
         if (isInit) {
           sessionId = crypto.randomUUID();
         }
@@ -298,9 +307,10 @@ if (transportMode === "http") {
           jsonrpc: "2.0",
           error: {
             code: -32000,
-            message: "Bad Request: Mcp-Session-Id header or initialize request is required"
+            message:
+              "Bad Request: Mcp-Session-Id header or initialize request is required",
           },
-          id: null
+          id: null,
         });
         return;
       }
@@ -309,7 +319,10 @@ if (transportMode === "http") {
         const session = await getOrCreateSession(sessionId);
         await session.transport.handleRequest(req, res, req.body);
       } catch (err: any) {
-        console.error(`[Vulmini] ❌ Error handling request for session ${sessionId}:`, err);
+        console.error(
+          `[Vulmini] ❌ Error handling request for session ${sessionId}:`,
+          err,
+        );
         res.status(500).json({ error: err.message || "Internal Server Error" });
       }
     },
@@ -319,10 +332,17 @@ if (transportMode === "http") {
     res.status(200).json({ status: "healthy", activeSessions: sessions.size });
   });
 
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error("[Vulmini] ❌ Route error:", err);
-    res.status(500).json({ error: err.message || "Internal Server Error" });
-  });
+  app.use(
+    (
+      err: any,
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      console.error("[Vulmini] ❌ Route error:", err);
+      res.status(500).json({ error: err.message || "Internal Server Error" });
+    },
+  );
 
   const port = parseInt(process.env.PORT || "3000", 10);
   app.listen(port, () => {
@@ -333,4 +353,3 @@ if (transportMode === "http") {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
-

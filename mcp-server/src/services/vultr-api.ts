@@ -131,7 +131,10 @@ export class VultrApiClient {
     for (let i = 0; i < maxAttempts; i++) {
       try {
         const instance = await this.getInstance(instanceId);
-        if (instance.status === "active" && instance.power_status === "running") {
+        if (
+          instance.status === "active" &&
+          instance.power_status === "running"
+        ) {
           return instance;
         }
         console.error(

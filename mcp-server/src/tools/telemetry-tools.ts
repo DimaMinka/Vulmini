@@ -252,8 +252,26 @@ HEALTH_EOF`,
     async ({ target }) => {
       const tarFile = "vulmini_deploy.tar.gz";
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
-      // Root of the project is 3 levels up from dist/tools/telemetry-tools.js
-      const projectRoot = path.resolve(__dirname, "../../../");
+      // Dynamic project root resolution
+      let projectRoot = path.resolve(__dirname, "../../");
+      while (
+        projectRoot !== "/" &&
+        !fs.existsSync(path.join(projectRoot, "package.json")) &&
+        !fs.existsSync(path.join(projectRoot, "docker-compose.yml"))
+      ) {
+        projectRoot = path.dirname(projectRoot);
+      }
+      if (
+        projectRoot === "/" ||
+        !fs.existsSync(path.join(projectRoot, "docker-compose.yml"))
+      ) {
+        // Fallback for VPS structure: check if we are in /var/www/vulmini-mcp and have /root/vulmini
+        if (fs.existsSync("/root/vulmini/docker-compose.yml")) {
+          projectRoot = "/root/vulmini";
+        } else {
+          projectRoot = path.resolve(__dirname, "../../../");
+        }
+      }
       const localTarPath = path.join(projectRoot, tarFile);
       const host = getHost(target);
 
@@ -325,6 +343,55 @@ HEALTH_EOF`,
         if (fs.existsSync(localTarPath)) {
           fs.unlinkSync(localTarPath);
         }
+      }
+    },
+  );
+
+  // ── fetch_mcp_server_logs ──
+  server.tool(
+    "fetch_mcp_server_logs",
+    "Fetch the tail of the MCP server's own systemd/journalctl logs. Use this to diagnose connection issues, transport errors, or tool failures without needing to SSH into the MCP server VPS.",
+    {
+      lines: z
+        .number()
+        .int()
+        .min(10)
+        .max(500)
+        .default(100)
+        .describe("Number of log lines to fetch (10-500)"),
+    },
+    async ({ lines }) => {
+      try {
+        const { execSync } = await import("node:child_process");
+        const stdout = execSync(
+          `journalctl -u vulmini-mcp -n ${lines} --no-pager`,
+          { encoding: "utf-8" },
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  lines_requested: lines,
+                  log_content: stdout,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to fetch MCP server logs: ${error.message || error}`,
+            },
+          ],
+        };
       }
     },
   );

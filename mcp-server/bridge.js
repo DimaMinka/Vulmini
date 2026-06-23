@@ -1,19 +1,19 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import readline from 'readline';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import readline from "readline";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Read token and host from .env
-const envPath = path.resolve(__dirname, '../.env');
-let token = 'my-secure-token';
-let host = '';
+const envPath = path.resolve(__dirname, "../.env");
+let token = "my-secure-token";
+let host = "";
 
 if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf-8');
+  const envContent = fs.readFileSync(envPath, "utf-8");
   const tokenMatch = envContent.match(/MCP_BEARER_TOKEN=([^\r\n]*)/);
   if (tokenMatch) token = tokenMatch[1].trim();
   const hostMatch = envContent.match(/VULTR_MCP_HOST=([^\r\n]*)/);
@@ -21,24 +21,25 @@ if (fs.existsSync(envPath)) {
 }
 
 if (!host) {
-  console.error("Error: VULTR_MCP_HOST is not defined in the .env file. No remote MCP host is configured.");
+  console.error(
+    "Error: VULTR_MCP_HOST is not defined in the .env file. No remote MCP host is configured.",
+  );
   process.exit(1);
 }
-
 
 async function main() {
   const url = new URL(`http://${host}/mcp`);
   const transport = new StreamableHTTPClientTransport(url, {
     requestInit: {
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    }
+        Authorization: `Bearer ${token}`,
+      },
+    },
   });
 
   transport.onmessage = (message) => {
     // Print the JSON-RPC message received from the remote server to stdout, followed by a newline
-    process.stdout.write(JSON.stringify(message) + '\n');
+    process.stdout.write(JSON.stringify(message) + "\n");
   };
 
   transport.onerror = (error) => {
@@ -46,13 +47,15 @@ async function main() {
     // Exit if session is expired, not found, or connection failed, triggering Claude Desktop to restart the bridge
     const msg = error.message || "";
     if (
-      msg.includes("Session not found") || 
-      msg.includes("404") || 
-      msg.includes("Not Found") || 
+      msg.includes("Session not found") ||
+      msg.includes("404") ||
+      msg.includes("Not Found") ||
       msg.includes("Server not initialized") ||
       msg.includes("reconnection attempts")
     ) {
-      console.error("Session is invalid or lost. Exiting to trigger restart...");
+      console.error(
+        "Session is invalid or lost. Exiting to trigger restart...",
+      );
       process.exit(1);
     }
   };
@@ -67,10 +70,10 @@ async function main() {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    terminal: false
+    terminal: false,
   });
 
-  rl.on('line', async (line) => {
+  rl.on("line", async (line) => {
     if (!line.trim()) return;
     try {
       const message = JSON.parse(line);
@@ -81,7 +84,7 @@ async function main() {
   });
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(`[Bridge Main Error]:`, err);
   process.exit(1);
 });

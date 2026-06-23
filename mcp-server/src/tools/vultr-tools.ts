@@ -15,9 +15,9 @@ import { fileURLToPath } from "node:url";
 function getEnvPath(dirname: string): string {
   const paths = [
     path.resolve(dirname, "../../../.env"), // dev src/tools/../../..
-    path.resolve(dirname, "../../.env"),    // prod dist/tools/../..
+    path.resolve(dirname, "../../.env"), // prod dist/tools/../..
     path.resolve(dirname, "../../../../.env"),
-    path.resolve(dirname, ".env")
+    path.resolve(dirname, ".env"),
   ];
   for (const p of paths) {
     if (fs.existsSync(p)) return p;

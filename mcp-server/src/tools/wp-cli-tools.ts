@@ -14,9 +14,9 @@ import { fileURLToPath } from "node:url";
 function getEnvPath(dirname: string): string {
   const paths = [
     path.resolve(dirname, "../../../.env"), // dev src/tools/../../..
-    path.resolve(dirname, "../../.env"),    // prod dist/tools/../..
+    path.resolve(dirname, "../../.env"), // prod dist/tools/../..
     path.resolve(dirname, "../../../../.env"),
-    path.resolve(dirname, ".env")
+    path.resolve(dirname, ".env"),
   ];
   for (const p of paths) {
     if (fs.existsSync(p)) return p;
@@ -302,7 +302,7 @@ export function registerWpCliTools(
     async ({ host }) => {
       // 1. Update in-memory WpCliService
       wpCli.setStagingHost(host);
-      
+
       // 2. Update process.env for telemetry tools
       process.env.VULMINI_STAGING_HOST = host;
 
@@ -313,14 +313,20 @@ export function registerWpCliTools(
         if (fs.existsSync(envPath)) {
           let envContent = fs.readFileSync(envPath, "utf-8");
           if (envContent.includes("VULMINI_STAGING_HOST=")) {
-            envContent = envContent.replace(/VULMINI_STAGING_HOST=[^\r\n]*/, `VULMINI_STAGING_HOST=${host}`);
+            envContent = envContent.replace(
+              /VULMINI_STAGING_HOST=[^\r\n]*/,
+              `VULMINI_STAGING_HOST=${host}`,
+            );
           } else {
             envContent += `\nVULMINI_STAGING_HOST=${host}\n`;
           }
           fs.writeFileSync(envPath, envContent, "utf-8");
         }
       } catch (err) {
-        console.error("[Vulmini] Failed to write staging host to .env file:", err);
+        console.error(
+          "[Vulmini] Failed to write staging host to .env file:",
+          err,
+        );
       }
 
       return {

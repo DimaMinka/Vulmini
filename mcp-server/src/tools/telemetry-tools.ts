@@ -318,8 +318,13 @@ HEALTH_EOF`,
         );
 
         // 5. Run Docker Compose
+        // Define services based on target to prevent trying to build vulmini_mcp on staging/prod
+        const services = target === "staging" || target === "production"
+          ? "vulmini_db vulmini_cache vulmini_app vulmini_cron vulmini_web vulmini_certbot"
+          : ""; // up everything if it's mcp target
+        
         const composeResult = await ssh.execute(
-          "cd /root/vulmini && docker compose down && docker compose up -d",
+          `cd /root/vulmini && docker compose down && docker compose up -d ${services}`.trim(),
           { host, timeoutMs: 300_000 },
         );
 

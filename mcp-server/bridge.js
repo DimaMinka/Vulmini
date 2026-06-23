@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 // Read token and host from .env
 const envPath = path.resolve(__dirname, '../.env');
 let token = 'my-secure-token';
-let host = '45.77.219.148';
+let host = '';
 
 if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf-8');
@@ -19,6 +19,12 @@ if (fs.existsSync(envPath)) {
   const hostMatch = envContent.match(/VULTR_MCP_HOST=([^\r\n]*)/);
   if (hostMatch) host = hostMatch[1].trim();
 }
+
+if (!host) {
+  console.error("Error: VULTR_MCP_HOST is not defined in the .env file. No remote MCP host is configured.");
+  process.exit(1);
+}
+
 
 async function main() {
   const url = new URL(`http://${host}/mcp`);

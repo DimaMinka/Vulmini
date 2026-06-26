@@ -148,6 +148,23 @@ conn.on("ready", async () => {
       "mkdir -p /root/vulmini && tar -xzf /root/vulmini.tar.gz -C /root/vulmini",
     );
 
+    // 4.1 Generate self-signed SSL cert if missing to prevent Nginx crash
+    console.log("3.1. Setting up dummy self-signed SSL certificates...");
+    await executeRemoteCommand(
+      conn,
+      "docker volume create vulmini_certbot_etc || true",
+    );
+    await executeRemoteCommand(
+      conn,
+      "docker run --rm -v vulmini_certbot_etc:/etc/letsencrypt alpine sh -c '" +
+        "if [ ! -f /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem ]; then " +
+        "mkdir -p /etc/letsencrypt/live/vulmini.cdk.app && " +
+        "apk add --no-cache openssl && " +
+        "openssl req -x509 -newkey rsa:2048 -keyout /etc/letsencrypt/live/vulmini.cdk.app/privkey.pem -out /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem -sha256 -days 3650 -nodes -subj \"/CN=vulmini.cdk.app\" && " +
+        "cp /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem /etc/letsencrypt/live/vulmini.cdk.app/chain.pem; " +
+        "fi'",
+    );
+
     // 5. Run Docker Compose
     console.log(
       `4. Running Docker Compose up for target services: ${dockerComposeServices}...`,

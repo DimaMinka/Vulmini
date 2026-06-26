@@ -322,6 +322,21 @@ HEALTH_EOF`,
         const services = target === "staging" || target === "production"
           ? "vulmini_db vulmini_cache vulmini_app vulmini_cron vulmini_web vulmini_certbot"
           : ""; // up everything if it's mcp target
+
+        if (target === "staging" || target === "production") {
+          // Setup fake SSL certificate if missing to prevent Nginx boot crash
+          await ssh.execute("docker volume create vulmini_certbot_etc || true", { host });
+          await ssh.execute(
+            "docker run --rm -v vulmini_certbot_etc:/etc/letsencrypt alpine sh -c '" +
+              "if [ ! -f /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem ]; then " +
+              "mkdir -p /etc/letsencrypt/live/vulmini.cdk.app && " +
+              "apk add --no-cache openssl && " +
+              "openssl req -x509 -newkey rsa:2048 -keyout /etc/letsencrypt/live/vulmini.cdk.app/privkey.pem -out /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem -sha256 -days 3650 -nodes -subj \"/CN=vulmini.cdk.app\" && " +
+              "cp /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem /etc/letsencrypt/live/vulmini.cdk.app/chain.pem; " +
+              "fi'",
+            { host },
+          );
+        }
         
         const composeResult = await ssh.execute(
           `cd /root/vulmini && docker compose down && docker compose up -d ${services}`.trim(),

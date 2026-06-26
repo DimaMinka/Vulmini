@@ -24,21 +24,24 @@ function jsonContent(data: unknown): { content: [{ type: 'text'; text: string }]
 }
 
 /** Wrap an error into a failed MCP tool response. */
-function errorResponse(message: string): { isError: true; content: [{ type: 'text'; text: string }] } {
+function errorResponse(message: string): {
+  isError: true;
+  content: [{ type: 'text'; text: string }];
+} {
   return { isError: true as const, content: [{ type: 'text' as const, text: message }] };
 }
 
 export function registerTelemetryTools(
   server: McpServer,
   ssh: SshExecutor,
-  getHost: (target: 'production' | 'staging') => string,
+  getHost: (target: 'production' | 'staging') => string
 ): void {
   // ── 1. System Health ──────────────────────────────────────────────────────
 
   // ── get_system_health ──
   server.tool(
-    "get_system_health",
-    "Get system health metrics: CPU usage, RAM usage, disk usage, load average, and uptime. Use this to monitor server resources before and after updates.",
+    'get_system_health',
+    'Get system health metrics: CPU usage, RAM usage, disk usage, load average, and uptime. Use this to monitor server resources before and after updates.',
     {
       target: targetSchema,
     },
@@ -55,15 +58,15 @@ export function registerTelemetryTools(
   "uptime_seconds": $(cat /proc/uptime | awk '{print int($1)}')
 }
 HEALTH_EOF`,
-          { host },
+          { host }
         );
 
         // Parse the raw output into structured JSON
         try {
           const raw = JSON.parse(result.stdout);
-          const loadParts = raw.load_average.split(" ").map(Number);
-          const memParts = raw.memory.split(" ").map(Number);
-          const diskParts = raw.disk.split(" ").map(Number);
+          const loadParts = raw.load_average.split(' ').map(Number);
+          const memParts = raw.memory.split(' ').map(Number);
+          const diskParts = raw.disk.split(' ').map(Number);
 
           const health = {
             cpu_cores: raw.cpu_cores,
@@ -86,15 +89,15 @@ HEALTH_EOF`,
       } catch (error) {
         return errorResponse(`Failed to get system health: ${error}`);
       }
-    },
+    }
   );
 
   // ── 2. Log Fetching ─────────────────────────────────────────────────────
 
   // ── fetch_error_logs ──
   server.tool(
-    "fetch_error_logs",
-    "Fetch the tail of WordPress error logs (wp-content/debug.log). Use this to diagnose issues after a failed update or when wp_health_check reports fatal errors.",
+    'fetch_error_logs',
+    'Fetch the tail of WordPress error logs (wp-content/debug.log). Use this to diagnose issues after a failed update or when wp_health_check reports fatal errors.',
     {
       target: targetSchema,
       lines: z
@@ -103,67 +106,61 @@ HEALTH_EOF`,
         .min(10)
         .max(500)
         .default(100)
-        .describe("Number of log lines to fetch (10-500)"),
+        .describe('Number of log lines to fetch (10-500)'),
     },
     async ({ target, lines }) => {
       try {
         const host = getHost(target);
         const result = await ssh.executeInContainer(
-          "vulmini_app",
+          'vulmini_app',
           `sh -c "tail -n ${lines} /var/www/html/wp-content/debug.log 2>/dev/null || echo 'No debug.log found (WP_DEBUG may be off)'"`,
-          { host },
+          { host }
         );
         return jsonContent({ target, lines_requested: lines, log_content: result.stdout });
       } catch (error) {
         return errorResponse(`Failed to fetch error logs: ${error}`);
       }
-    },
+    }
   );
 
   // ── fetch_nginx_logs ──
   server.tool(
-    "fetch_nginx_logs",
-    "Fetch the tail of Nginx access or error logs. Use to diagnose HTTP errors (5xx, 4xx) or traffic patterns.",
+    'fetch_nginx_logs',
+    'Fetch the tail of Nginx access or error logs. Use to diagnose HTTP errors (5xx, 4xx) or traffic patterns.',
     {
       target: targetSchema,
-      log_type: z
-        .enum(["access", "error"])
-        .default("error")
-        .describe("Which Nginx log to fetch"),
-      lines: z
-        .number()
-        .int()
-        .min(10)
-        .max(500)
-        .default(50)
-        .describe("Number of log lines to fetch"),
+      log_type: z.enum(['access', 'error']).default('error').describe('Which Nginx log to fetch'),
+      lines: z.number().int().min(10).max(500).default(50).describe('Number of log lines to fetch'),
     },
     async ({ target, log_type, lines }) => {
       try {
         const host = getHost(target);
         const logFile =
-          log_type === "access"
-            ? "/var/log/nginx/access.log"
-            : "/var/log/nginx/error.log";
+          log_type === 'access' ? '/var/log/nginx/access.log' : '/var/log/nginx/error.log';
 
         const result = await ssh.executeInContainer(
-          "vulmini_web",
+          'vulmini_web',
           `tail -n ${lines} ${logFile} 2>/dev/null || echo 'Log file not found'`,
-          { host },
+          { host }
         );
-        return jsonContent({ target, log_type, lines_requested: lines, log_content: result.stdout });
+        return jsonContent({
+          target,
+          log_type,
+          lines_requested: lines,
+          log_content: result.stdout,
+        });
       } catch (error) {
         return errorResponse(`Failed to fetch nginx logs: ${error}`);
       }
-    },
+    }
   );
 
   // ── 3. Docker & Deployment ───────────────────────────────────────────────
 
   // ── get_docker_status ──
   server.tool(
-    "get_docker_status",
-    "Get the status of all Docker containers in the Vulmini stack (vulmini_db, vulmini_cache, vulmini_app, vulmini_web, vulmini_cron). Shows running state and health status.",
+    'get_docker_status',
+    'Get the status of all Docker containers in the Vulmini stack (vulmini_db, vulmini_cache, vulmini_app, vulmini_web, vulmini_cron). Shows running state and health status.',
     {
       target: targetSchema,
     },
@@ -172,12 +169,12 @@ HEALTH_EOF`,
         const host = getHost(target);
         const result = await ssh.execute(
           `docker ps --format '{"name":"{{.Names}}","state":"{{.State}}","status":"{{.Status}}","health":"{{.Label "com.docker.compose.service"}}"}' --filter "label=com.docker.compose.project" | head -20`,
-          { host },
+          { host }
         );
 
         // Parse each line as JSON
         const containers = result.stdout
-          .split("\n")
+          .split('\n')
           .filter((line) => line.trim())
           .map((line) => {
             try {
@@ -191,37 +188,34 @@ HEALTH_EOF`,
       } catch (error) {
         return errorResponse(`Failed to get Docker status: ${error}`);
       }
-    },
+    }
   );
 
   // ── deploy_stack ──
   server.tool(
-    "deploy_stack",
-    "Deploy/Redeploy the Docker stack (WordPress, MariaDB, Nginx, PHP, Cron) to the target server. Packages local project configuration, uploads it, installs Docker if needed, and starts the container stack.",
+    'deploy_stack',
+    'Deploy/Redeploy the Docker stack (WordPress, MariaDB, Nginx, PHP, Cron) to the target server. Packages local project configuration, uploads it, installs Docker if needed, and starts the container stack.',
     {
       target: targetSchema,
     },
     async ({ target }) => {
-      const tarFile = "vulmini_deploy.tar.gz";
+      const tarFile = 'vulmini_deploy.tar.gz';
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
       // Dynamic project root resolution
-      let projectRoot = path.resolve(__dirname, "../../");
+      let projectRoot = path.resolve(__dirname, '../../');
       while (
-        projectRoot !== "/" &&
-        !fs.existsSync(path.join(projectRoot, "package.json")) &&
-        !fs.existsSync(path.join(projectRoot, "docker-compose.yml"))
+        projectRoot !== '/' &&
+        !fs.existsSync(path.join(projectRoot, 'package.json')) &&
+        !fs.existsSync(path.join(projectRoot, 'docker-compose.yml'))
       ) {
         projectRoot = path.dirname(projectRoot);
       }
-      if (
-        projectRoot === "/" ||
-        !fs.existsSync(path.join(projectRoot, "docker-compose.yml"))
-      ) {
+      if (projectRoot === '/' || !fs.existsSync(path.join(projectRoot, 'docker-compose.yml'))) {
         // Fallback for VPS structure: check if we are in /var/www/vulmini-mcp and have /root/vulmini
-        if (fs.existsSync("/root/vulmini/docker-compose.yml")) {
-          projectRoot = "/root/vulmini";
+        if (fs.existsSync('/root/vulmini/docker-compose.yml')) {
+          projectRoot = '/root/vulmini';
         } else {
-          projectRoot = path.resolve(__dirname, "../../../");
+          projectRoot = path.resolve(__dirname, '../../../');
         }
       }
       const localTarPath = path.join(projectRoot, tarFile);
@@ -231,14 +225,14 @@ HEALTH_EOF`,
         // 1. Pack project files locally
         execSync(
           `tar -czf "${localTarPath}" -C "${projectRoot}" docker-compose.yml .env nginx php scripts`,
-          { stdio: "pipe" },
+          { stdio: 'pipe' }
         );
       } catch (err) {
         return {
           isError: true,
           content: [
             {
-              type: "text",
+              type: 'text',
               text: `Failed to package local project files: ${err}`,
             },
           ],
@@ -247,59 +241,55 @@ HEALTH_EOF`,
 
       try {
         // 2. Check/Install Docker on remote host
-        const checkDocker = await ssh.execute(
-          "which docker || echo 'missing'",
-          { host },
-        );
-        if (checkDocker.stdout.includes("missing")) {
+        const checkDocker = await ssh.execute("which docker || echo 'missing'", { host });
+        if (checkDocker.stdout.includes('missing')) {
           // Install Docker
           await ssh.execute(
-            "curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh",
-            { host, timeoutMs: 300_000 },
+            'curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh',
+            { host, timeoutMs: 300_000 }
           );
         }
 
         // 3. Upload tarball
-        const remoteTar = "/root/vulmini.tar.gz";
+        const remoteTar = '/root/vulmini.tar.gz';
         await ssh.uploadFile(localTarPath, remoteTar, { host });
 
         // 4. Extract tarball
         await ssh.execute(
-          "mkdir -p /root/vulmini && tar -xzf /root/vulmini.tar.gz -C /root/vulmini",
-          { host },
+          'mkdir -p /root/vulmini && tar -xzf /root/vulmini.tar.gz -C /root/vulmini',
+          { host }
         );
 
         // 5. Run Docker Compose
         // Define services based on target to prevent trying to build vulmini_mcp on staging/prod
         const services =
-          target === "staging" || target === "production"
-            ? "vulmini_db vulmini_cache vulmini_app vulmini_cron vulmini_web vulmini_certbot"
-            : ""; // up everything if it's mcp target
+          target === 'staging' || target === 'production'
+            ? 'vulmini_db vulmini_cache vulmini_app vulmini_cron vulmini_web vulmini_certbot'
+            : ''; // up everything if it's mcp target
 
-        if (target === "staging" || target === "production") {
+        if (target === 'staging' || target === 'production') {
           // Setup fake SSL certificate if missing to prevent Nginx boot crash
-          await ssh.execute(
-            "docker volume create vulmini_certbot_etc || true",
-            { host },
-          );
+          await ssh.execute('docker volume create vulmini_certbot_etc || true', { host });
           await ssh.execute(
             "docker run --rm -v vulmini_certbot_etc:/etc/letsencrypt alpine sh -c '" +
-              "if [ ! -f /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem ]; then " +
-              "mkdir -p /etc/letsencrypt/live/vulmini.cdk.app && " +
-              "apk add --no-cache openssl && " +
+              'if [ ! -f /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem ]; then ' +
+              'mkdir -p /etc/letsencrypt/live/vulmini.cdk.app && ' +
+              'apk add --no-cache openssl && ' +
               'openssl req -x509 -newkey rsa:2048 -keyout /etc/letsencrypt/live/vulmini.cdk.app/privkey.pem -out /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem -sha256 -days 3650 -nodes -subj "/CN=vulmini.cdk.app" && ' +
-              "cp /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem /etc/letsencrypt/live/vulmini.cdk.app/chain.pem; " +
+              'cp /etc/letsencrypt/live/vulmini.cdk.app/fullchain.pem /etc/letsencrypt/live/vulmini.cdk.app/chain.pem; ' +
               "fi'",
-            { host },
+            { host }
           );
         }
 
         const composeResult = await ssh.execute(
           `cd /root/vulmini && docker compose down && docker compose up -d ${services}`.trim(),
-          { host, timeoutMs: 300_000 },
+          { host, timeoutMs: 300_000 }
         );
 
-        return jsonContent(`Docker Stack deployed successfully to ${target} (${host})!\n\nOutput:\n${composeResult.stdout}`);
+        return jsonContent(
+          `Docker Stack deployed successfully to ${target} (${host})!\n\nOutput:\n${composeResult.stdout}`
+        );
       } catch (error) {
         return errorResponse(`Deployment failed on ${target}: ${error}`);
       } finally {
@@ -308,12 +298,12 @@ HEALTH_EOF`,
           fs.unlinkSync(localTarPath);
         }
       }
-    },
+    }
   );
 
   // ── fetch_mcp_server_logs ──
   server.tool(
-    "fetch_mcp_server_logs",
+    'fetch_mcp_server_logs',
     "Fetch the tail of the MCP server's own systemd/journalctl logs. Use this to diagnose connection issues, transport errors, or tool failures without needing to SSH into the MCP server VPS.",
     {
       lines: z
@@ -322,21 +312,20 @@ HEALTH_EOF`,
         .min(10)
         .max(500)
         .default(100)
-        .describe("Number of log lines to fetch (10-500)"),
+        .describe('Number of log lines to fetch (10-500)'),
     },
     async ({ lines }) => {
       try {
-        const { execSync } = await import("node:child_process");
-        const stdout = execSync(
-          `journalctl -u vulmini-mcp -n ${lines} --no-pager`,
-          { encoding: "utf-8" },
-        );
+        const { execSync } = await import('node:child_process');
+        const stdout = execSync(`journalctl -u vulmini-mcp -n ${lines} --no-pager`, {
+          encoding: 'utf-8',
+        });
         return jsonContent({ lines_requested: lines, log_content: stdout });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         return errorResponse(`Failed to fetch MCP server logs: ${msg}`);
       }
-    },
+    }
   );
 }
 
@@ -349,5 +338,5 @@ function formatUptime(seconds: number): string {
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);
-  return parts.join(" ") || "< 1m";
+  return parts.join(' ') || '< 1m';
 }

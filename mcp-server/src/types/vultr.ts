@@ -3,10 +3,10 @@
 // ==========================================
 
 /** Vultr instance status */
-export type InstanceStatus = "pending" | "active" | "suspended" | "resizing";
+export type InstanceStatus = 'pending' | 'active' | 'suspended' | 'resizing';
 
 /** Vultr power status */
-export type PowerStatus = "running" | "stopped";
+export type PowerStatus = 'running' | 'stopped';
 
 /** Vultr instance (VPS) */
 export interface VultrInstance {
@@ -35,7 +35,7 @@ export interface VultrSnapshot {
   description: string;
   size: number;
   compressed_size: number;
-  status: "pending" | "complete";
+  status: 'pending' | 'complete';
   os_id: number;
   app_id: number;
 }
@@ -50,7 +50,7 @@ export interface CreateInstanceRequest {
   hostname?: string;
   sshkey_id?: string[];
   enable_ipv6?: boolean;
-  backups?: "enabled" | "disabled";
+  backups?: 'enabled' | 'disabled';
   tags?: string[];
   firewall_group_id?: string;
 }
@@ -70,7 +70,7 @@ export interface VultrListResponse<T> {
       prev: string;
     };
   };
-  [key: string]: T[] | VultrListResponse<T>["meta"];
+  [key: string]: T[] | VultrListResponse<T>['meta'];
 }
 
 /** Vultr Object Storage subscription */

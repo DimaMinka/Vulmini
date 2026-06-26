@@ -11,40 +11,40 @@
 //   npx tsx src/index.ts      — development
 //   npx @modelcontextprotocol/inspector node dist/index.js — debug
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import dns from "node:dns";
-dns.setDefaultResultOrder("ipv4first");
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import dns from 'node:dns';
+dns.setDefaultResultOrder('ipv4first');
 
-import express from "express";
-import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import express from 'express';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { VultrApiClient } from "./services/vultr-api.js";
-import { SshExecutor } from "./services/ssh-executor.js";
-import { WpCliService } from "./services/wp-cli.js";
+import { VultrApiClient } from './services/vultr-api.js';
+import { SshExecutor } from './services/ssh-executor.js';
+import { WpCliService } from './services/wp-cli.js';
 
-import { registerVultrTools } from "./tools/vultr-tools.js";
-import { registerWpCliTools } from "./tools/wp-cli-tools.js";
-import { registerTelemetryTools } from "./tools/telemetry-tools.js";
+import { registerVultrTools } from './tools/vultr-tools.js';
+import { registerWpCliTools } from './tools/wp-cli-tools.js';
+import { registerTelemetryTools } from './tools/telemetry-tools.js';
 
 // ── Load Environment Variables from .env ──
 try {
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  let envPath = path.resolve(__dirname, "../../.env");
+  let envPath = path.resolve(__dirname, '../../.env');
   if (!fs.existsSync(envPath)) {
-    envPath = path.resolve(__dirname, "../.env");
+    envPath = path.resolve(__dirname, '../.env');
   }
   if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, "utf-8");
+    const envContent = fs.readFileSync(envPath, 'utf-8');
     envContent.split(/\r?\n/).forEach((line) => {
       const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
       if (match) {
         const key = match[1];
-        let value = match[2] || "";
+        let value = match[2] || '';
         if (value.startsWith('"') && value.endsWith('"')) {
           value = value.slice(1, -1);
         } else if (value.startsWith("'") && value.endsWith("'")) {
@@ -55,7 +55,7 @@ try {
     });
   }
 } catch (e) {
-  console.error("[Vulmini] Error loading .env file:", e);
+  console.error('[Vulmini] Error loading .env file:', e);
 }
 
 // ── Configuration from Environment ──
@@ -75,14 +75,14 @@ function optionalEnv(name: string, defaultValue: string): string {
 
 // ── Initialize Services ──
 
-const vultrApiKey = requireEnv("VULTR_API_KEY");
-const vultrRegion = optionalEnv("VULTR_REGION", "tlv");
-const vultrPlan = optionalEnv("VULTR_PLAN", "vhf-2c-4gb");
+const vultrApiKey = requireEnv('VULTR_API_KEY');
+const vultrRegion = optionalEnv('VULTR_REGION', 'tlv');
+const vultrPlan = optionalEnv('VULTR_PLAN', 'vhf-2c-4gb');
 
-const sshHost = optionalEnv("SSH_HOST", "");
-const sshPort = parseInt(optionalEnv("SSH_PORT", "22"), 10);
-const sshUser = optionalEnv("SSH_USER", "root");
-const sshKeyPath = optionalEnv("SSH_PRIVATE_KEY_PATH", "~/.ssh/vulmini_rsa");
+const sshHost = optionalEnv('SSH_HOST', '');
+const sshPort = parseInt(optionalEnv('SSH_PORT', '22'), 10);
+const sshUser = optionalEnv('SSH_USER', 'root');
+const sshKeyPath = optionalEnv('SSH_PRIVATE_KEY_PATH', '~/.ssh/vulmini_rsa');
 
 // Services
 const vultr = new VultrApiClient(vultrApiKey);
@@ -101,8 +101,8 @@ const wpCli = new WpCliService(ssh, {
 // ── Create MCP Server ──
 
 const server = new McpServer({
-  name: "vulmini-mcp-server",
-  version: "0.1.0",
+  name: 'vulmini-mcp-server',
+  version: '0.1.0',
 });
 
 // ── Register All Tool Groups ──
@@ -120,14 +120,14 @@ registerWpCliTools(server, wpCli);
 registerTelemetryTools(server, ssh, (target) => {
   try {
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const envPath = path.resolve(__dirname, "../../.env");
+    const envPath = path.resolve(__dirname, '../../.env');
     if (fs.existsSync(envPath)) {
-      const envContent = fs.readFileSync(envPath, "utf-8");
+      const envContent = fs.readFileSync(envPath, 'utf-8');
       envContent.split(/\r?\n/).forEach((line) => {
         const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
         if (match) {
           const key = match[1];
-          let value = match[2] || "";
+          let value = match[2] || '';
           if (value.startsWith('"') && value.endsWith('"')) {
             value = value.slice(1, -1);
           } else if (value.startsWith("'") && value.endsWith("'")) {
@@ -138,21 +138,19 @@ registerTelemetryTools(server, ssh, (target) => {
       });
     }
   } catch (e) {
-    console.error("[Vulmini] Error reloading .env file:", e);
+    console.error('[Vulmini] Error reloading .env file:', e);
   }
 
-  if (target === "staging") {
+  if (target === 'staging') {
     const stagingHost = process.env.VULMINI_STAGING_HOST;
     if (!stagingHost) {
-      throw new Error(
-        "Staging host not configured. Use set_staging_host tool first.",
-      );
+      throw new Error('Staging host not configured. Use set_staging_host tool first.');
     }
     return stagingHost;
   }
   const prodHost = process.env.SSH_HOST;
   if (!prodHost) {
-    throw new Error("Production host not configured under SSH_HOST in .env");
+    throw new Error('Production host not configured under SSH_HOST in .env');
   }
   return prodHost;
 });
@@ -161,11 +159,10 @@ registerTelemetryTools(server, ssh, (target) => {
 
 // ── Connect Server ──
 
-const transportMode =
-  process.env.MCP_TRANSPORT || (process.env.PORT ? "http" : "stdio");
+const transportMode = process.env.MCP_TRANSPORT || (process.env.PORT ? 'http' : 'stdio');
 
-if (transportMode === "http") {
-  console.error("[Vulmini] 🚀 Starting MCP server in HTTP mode...");
+if (transportMode === 'http') {
+  console.error('[Vulmini] 🚀 Starting MCP server in HTTP mode...');
   const app = express();
   app.use(express.json());
 
@@ -173,20 +170,18 @@ if (transportMode === "http") {
   const authenticate = (
     req: express.Request,
     res: express.Response,
-    next: express.NextFunction,
+    next: express.NextFunction
   ) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({ error: "Unauthorized" });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
     const token = authHeader.substring(7);
     const expectedToken = process.env.MCP_BEARER_TOKEN;
     if (!expectedToken) {
-      console.error(
-        "[Vulmini] ❌ MCP_BEARER_TOKEN is not configured in environment",
-      );
-      res.status(500).json({ error: "Server Configuration Error" });
+      console.error('[Vulmini] ❌ MCP_BEARER_TOKEN is not configured in environment');
+      res.status(500).json({ error: 'Server Configuration Error' });
       return;
     }
 
@@ -201,7 +196,7 @@ if (transportMode === "http") {
     }
 
     if (!equal) {
-      res.status(401).json({ error: "Unauthorized" });
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
     next();
@@ -228,15 +223,12 @@ if (transportMode === "http") {
       }
 
       transport.onerror = (err) => {
-        console.error(
-          `[Vulmini] ❌ Transport error for session ${sessionId}:`,
-          err,
-        );
+        console.error(`[Vulmini] ❌ Transport error for session ${sessionId}:`, err);
       };
 
       const s = new McpServer({
-        name: "vulmini-mcp-server",
-        version: "0.1.0",
+        name: 'vulmini-mcp-server',
+        version: '0.1.0',
       });
       registerVultrTools(s, vultr, {
         region: vultrRegion,
@@ -244,17 +236,17 @@ if (transportMode === "http") {
       });
       registerWpCliTools(s, wpCli);
       registerTelemetryTools(s, ssh, (target) => {
-        if (target === "staging") {
+        if (target === 'staging') {
           try {
             const __dirname = path.dirname(fileURLToPath(import.meta.url));
-            const envPath = path.resolve(__dirname, "../../.env");
+            const envPath = path.resolve(__dirname, '../../.env');
             if (fs.existsSync(envPath)) {
-              const envContent = fs.readFileSync(envPath, "utf-8");
+              const envContent = fs.readFileSync(envPath, 'utf-8');
               envContent.split(/\r?\n/).forEach((line) => {
                 const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
                 if (match) {
                   const key = match[1];
-                  let value = match[2] || "";
+                  let value = match[2] || '';
                   if (value.startsWith('"') && value.endsWith('"')) {
                     value = value.slice(1, -1);
                   } else if (value.startsWith("'") && value.endsWith("'")) {
@@ -265,14 +257,12 @@ if (transportMode === "http") {
               });
             }
           } catch (e) {
-            console.error("[Vulmini] Error reloading .env file:", e);
+            console.error('[Vulmini] Error reloading .env file:', e);
           }
 
           const stagingHost = process.env.VULMINI_STAGING_HOST;
           if (!stagingHost) {
-            throw new Error(
-              "Staging host not configured. Use set_staging_host tool first.",
-            );
+            throw new Error('Staging host not configured. Use set_staging_host tool first.');
           }
           return stagingHost;
         }
@@ -286,72 +276,55 @@ if (transportMode === "http") {
     return session;
   };
 
-  app.all(
-    "/mcp",
-    authenticate,
-    async (req: express.Request, res: express.Response) => {
-      let sessionId = req.headers["mcp-session-id"] as string | undefined;
+  app.all('/mcp', authenticate, async (req: express.Request, res: express.Response) => {
+    let sessionId = req.headers['mcp-session-id'] as string | undefined;
 
-      // If it's a POST and has no session id, check if it's an initialize request
-      if (!sessionId && req.method === "POST" && req.body) {
-        const body = req.body;
-        const messages = Array.isArray(body) ? body : [body];
-        const isInit = messages.some(
-          (msg) => msg && msg.method === "initialize",
-        );
-        if (isInit) {
-          sessionId = crypto.randomUUID();
-        }
+    // If it's a POST and has no session id, check if it's an initialize request
+    if (!sessionId && req.method === 'POST' && req.body) {
+      const body = req.body;
+      const messages = Array.isArray(body) ? body : [body];
+      const isInit = messages.some((msg) => msg && msg.method === 'initialize');
+      if (isInit) {
+        sessionId = crypto.randomUUID();
       }
+    }
 
-      if (!sessionId) {
-        res.status(400).json({
-          jsonrpc: "2.0",
-          error: {
-            code: -32000,
-            message:
-              "Bad Request: Mcp-Session-Id header or initialize request is required",
-          },
-          id: null,
-        });
-        return;
-      }
+    if (!sessionId) {
+      res.status(400).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Bad Request: Mcp-Session-Id header or initialize request is required',
+        },
+        id: null,
+      });
+      return;
+    }
 
-      try {
-        const session = await getOrCreateSession(sessionId);
-        await session.transport.handleRequest(req, res, req.body);
-      } catch (err: any) {
-        console.error(
-          `[Vulmini] ❌ Error handling request for session ${sessionId}:`,
-          err,
-        );
-        res.status(500).json({ error: err.message || "Internal Server Error" });
-      }
-    },
-  );
-
-  app.get("/health", (req: express.Request, res: express.Response) => {
-    res.status(200).json({ status: "healthy", activeSessions: sessions.size });
+    try {
+      const session = await getOrCreateSession(sessionId);
+      await session.transport.handleRequest(req, res, req.body);
+    } catch (err: any) {
+      console.error(`[Vulmini] ❌ Error handling request for session ${sessionId}:`, err);
+      res.status(500).json({ error: err.message || 'Internal Server Error' });
+    }
   });
 
-  app.use(
-    (
-      err: any,
-      req: express.Request,
-      res: express.Response,
-      next: express.NextFunction,
-    ) => {
-      console.error("[Vulmini] ❌ Route error:", err);
-      res.status(500).json({ error: err.message || "Internal Server Error" });
-    },
-  );
+  app.get('/health', (req: express.Request, res: express.Response) => {
+    res.status(200).json({ status: 'healthy', activeSessions: sessions.size });
+  });
 
-  const port = parseInt(process.env.PORT || "3000", 10);
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('[Vulmini] ❌ Route error:', err);
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
+  });
+
+  const port = parseInt(process.env.PORT || '3000', 10);
   app.listen(port, () => {
     console.error(`[Vulmini] ✅ MCP HTTP server listening on port ${port}`);
   });
 } else {
-  console.error("[Vulmini] 🚀 Starting MCP server in Stdio mode...");
+  console.error('[Vulmini] 🚀 Starting MCP server in Stdio mode...');
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

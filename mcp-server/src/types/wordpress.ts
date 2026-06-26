@@ -5,11 +5,11 @@
 /** WordPress plugin info from WP-CLI `wp plugin list --format=json` */
 export interface WpPlugin {
   name: string;
-  status: "active" | "inactive" | "must-use" | "dropin";
-  update: "available" | "none";
+  status: 'active' | 'inactive' | 'must-use' | 'dropin';
+  update: 'available' | 'none';
   version: string;
   update_version?: string;
-  auto_update: "on" | "off";
+  auto_update: 'on' | 'off';
 }
 
 /** WordPress core info from WP-CLI `wp core version --extra` */
@@ -34,7 +34,7 @@ export interface WpHealthCheck {
 /** Backup result */
 export interface BackupResult {
   backup_id: string;
-  scope: "full" | "db" | "plugin";
+  scope: 'full' | 'db' | 'plugin';
   files: string[];
   timestamp: string;
 }
@@ -42,7 +42,7 @@ export interface BackupResult {
 /** Restore result */
 export interface RestoreResult {
   backup_id: string;
-  scope: "full" | "db" | "plugins";
+  scope: 'full' | 'db' | 'plugins';
   success: boolean;
   message: string;
 }
@@ -69,4 +69,4 @@ export interface DockerContainerStatus {
 }
 
 /** Target server for commands */
-export type ServerTarget = "production" | "staging";
+export type ServerTarget = 'production' | 'staging';

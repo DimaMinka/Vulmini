@@ -27,16 +27,19 @@ function jsonContent(data: unknown): { content: [{ type: 'text'; text: string }]
 }
 
 /** Wrap an error string as a failed MCP tool response. */
-function errorContent(message: string): { isError: true; content: [{ type: 'text'; text: string }] } {
+function errorContent(message: string): {
+  isError: true;
+  content: [{ type: 'text'; text: string }];
+} {
   return { isError: true as const, content: [{ type: 'text' as const, text: message }] };
 }
 
 function getEnvPath(dirname: string): string {
   const paths = [
-    path.resolve(dirname, "../../../.env"), // dev src/tools/../../..
-    path.resolve(dirname, "../../.env"), // prod dist/tools/../..
-    path.resolve(dirname, "../../../../.env"),
-    path.resolve(dirname, ".env"),
+    path.resolve(dirname, '../../../.env'), // dev src/tools/../../..
+    path.resolve(dirname, '../../.env'), // prod dist/tools/../..
+    path.resolve(dirname, '../../../../.env'),
+    path.resolve(dirname, '.env'),
   ];
   for (const p of paths) {
     if (fs.existsSync(p)) return p;
@@ -44,18 +47,13 @@ function getEnvPath(dirname: string): string {
   return paths[0];
 }
 
-
-
-export function registerWpCliTools(
-  server: McpServer,
-  wpCli: WpCliService,
-): void {
+export function registerWpCliTools(server: McpServer, wpCli: WpCliService): void {
   // ── 1. Plugin Management ────────────────────────────────────────────────────
 
   // ── wp_plugin_status ──
   server.tool(
-    "wp_plugin_status",
-    "Get a JSON list of all WordPress plugins with their status, current version, and available updates. Use this to determine which plugins need updating before running wp_run_update.",
+    'wp_plugin_status',
+    'Get a JSON list of all WordPress plugins with their status, current version, and available updates. Use this to determine which plugins need updating before running wp_run_update.',
     {
       target: targetSchema,
     },
@@ -72,21 +70,19 @@ export function registerWpCliTools(
       } catch (error) {
         return errorContent(`Failed to get plugin status: ${error}`);
       }
-    },
+    }
   );
 
   // ── wp_run_update ──
   server.tool(
-    "wp_run_update",
-    "Update a specific WordPress plugin or all plugins. In the Twin-Instance workflow, always run this on staging first, then on production after verifying with wp_health_check.",
+    'wp_run_update',
+    'Update a specific WordPress plugin or all plugins. In the Twin-Instance workflow, always run this on staging first, then on production after verifying with wp_health_check.',
     {
       target: targetSchema,
       plugin_slug: z
         .string()
         .optional()
-        .describe(
-          "Specific plugin slug to update. Omit to update ALL plugins.",
-        ),
+        .describe('Specific plugin slug to update. Omit to update ALL plugins.'),
     },
     async ({ target, plugin_slug }) => {
       try {
@@ -100,15 +96,15 @@ export function registerWpCliTools(
       } catch (error) {
         return errorContent(`Plugin update failed on ${target}: ${error}`);
       }
-    },
+    }
   );
 
   // ── 2. Database & Health ──────────────────────────────────────────────────
 
   // ── wp_db_migrate ──
   server.tool(
-    "wp_db_migrate",
-    "Run WordPress core database migration (wp core update-db) and LearnDash data upgrades (wp learndash data_upgrades). Execute this on production AFTER successful plugin updates and health check on staging.",
+    'wp_db_migrate',
+    'Run WordPress core database migration (wp core update-db) and LearnDash data upgrades (wp learndash data_upgrades). Execute this on production AFTER successful plugin updates and health check on staging.',
     {
       target: targetSchema,
     },
@@ -123,13 +119,13 @@ export function registerWpCliTools(
       } catch (error) {
         return errorContent(`DB migration failed on ${target}: ${error}`);
       }
-    },
+    }
   );
 
   // ── wp_health_check ──
   server.tool(
-    "wp_health_check",
-    "Perform a health check on the WordPress site: HTTP response test (expects 200 OK) and scan for PHP Fatal Errors in logs. Returns is_healthy boolean. Use this after every update or migration to verify the site is working correctly.",
+    'wp_health_check',
+    'Perform a health check on the WordPress site: HTTP response test (expects 200 OK) and scan for PHP Fatal Errors in logs. Returns is_healthy boolean. Use this after every update or migration to verify the site is working correctly.',
     {
       target: targetSchema,
     },
@@ -140,27 +136,22 @@ export function registerWpCliTools(
       } catch (error) {
         return errorContent(`Health check failed on ${target}: ${error}`);
       }
-    },
+    }
   );
 
   // ── 3. Backup & Restore ──────────────────────────────────────────────────
 
   // ── wp_run_backup ──
   server.tool(
-    "wp_run_backup",
-    "Create a backup of the database and/or plugins BEFORE making any changes on production. This is a critical safety step in the Twin-Instance workflow. Returns a backup_id that can be used with wp_run_restore for emergency rollback.",
+    'wp_run_backup',
+    'Create a backup of the database and/or plugins BEFORE making any changes on production. This is a critical safety step in the Twin-Instance workflow. Returns a backup_id that can be used with wp_run_restore for emergency rollback.',
     {
       target: targetSchema,
       scope: z
-        .enum(["full", "db", "plugin"])
-        .default("full")
-        .describe(
-          "Backup scope: 'full' (DB + plugins), 'db' only, or 'plugin' (specific plugin)",
-        ),
-      plugin_slug: z
-        .string()
-        .optional()
-        .describe("Plugin slug when scope is 'plugin'"),
+        .enum(['full', 'db', 'plugin'])
+        .default('full')
+        .describe("Backup scope: 'full' (DB + plugins), 'db' only, or 'plugin' (specific plugin)"),
+      plugin_slug: z.string().optional().describe("Plugin slug when scope is 'plugin'"),
     },
     async ({ target, scope, plugin_slug }) => {
       try {
@@ -174,23 +165,21 @@ export function registerWpCliTools(
       } catch (error) {
         return errorContent(`Backup failed on ${target}: ${error}`);
       }
-    },
+    }
   );
 
   // ── wp_run_restore ──
   server.tool(
-    "wp_run_restore",
-    "EMERGENCY ROLLBACK: Restore the database and/or plugins from a previous backup. Use this when production shows errors after an update. Provide the backup_id from the wp_run_backup output.",
+    'wp_run_restore',
+    'EMERGENCY ROLLBACK: Restore the database and/or plugins from a previous backup. Use this when production shows errors after an update. Provide the backup_id from the wp_run_backup output.',
     {
       target: targetSchema,
       backup_id: z
         .string()
-        .describe(
-          "The backup_id (timestamp like '20250621_143000') from wp_run_backup",
-        ),
+        .describe("The backup_id (timestamp like '20250621_143000') from wp_run_backup"),
       scope: z
-        .enum(["full", "db", "plugins"])
-        .default("full")
+        .enum(['full', 'db', 'plugins'])
+        .default('full')
         .describe("Restore scope: 'full', 'db' only, or 'plugins' only"),
     },
     async ({ target, backup_id, scope }) => {
@@ -206,17 +195,17 @@ export function registerWpCliTools(
       } catch (error) {
         return errorContent(`Restore failed on ${target}: ${error}`);
       }
-    },
+    }
   );
 
   // ── 4. Server Setup ───────────────────────────────────────────────────────
 
   // ── set_staging_host ──
   server.tool(
-    "set_staging_host",
-    "Set the SSH host for the staging server. Call this after create_ephemeral_staging returns an IP address, so that WP-CLI and telemetry tools can target the staging server.",
+    'set_staging_host',
+    'Set the SSH host for the staging server. Call this after create_ephemeral_staging returns an IP address, so that WP-CLI and telemetry tools can target the staging server.',
     {
-      host: z.string().ip().describe("IP address of the staging VPS"),
+      host: z.string().ip().describe('IP address of the staging VPS'),
     },
     async ({ host }) => {
       // 1. Update in-memory WpCliService
@@ -230,43 +219,42 @@ export function registerWpCliTools(
         const __dirname = path.dirname(fileURLToPath(import.meta.url));
         const envPath = getEnvPath(__dirname);
         if (fs.existsSync(envPath)) {
-          let envContent = fs.readFileSync(envPath, "utf-8");
-          if (envContent.includes("VULMINI_STAGING_HOST=")) {
+          let envContent = fs.readFileSync(envPath, 'utf-8');
+          if (envContent.includes('VULMINI_STAGING_HOST=')) {
             envContent = envContent.replace(
               /VULMINI_STAGING_HOST=[^\r\n]*/,
-              `VULMINI_STAGING_HOST=${host}`,
+              `VULMINI_STAGING_HOST=${host}`
             );
           } else {
             envContent += `\nVULMINI_STAGING_HOST=${host}\n`;
           }
-          fs.writeFileSync(envPath, envContent, "utf-8");
+          fs.writeFileSync(envPath, envContent, 'utf-8');
         }
       } catch (err) {
-        console.error(
-          "[Vulmini] Failed to write staging host to .env file:",
-          err,
-        );
+        console.error('[Vulmini] Failed to write staging host to .env file:', err);
       }
 
-      return jsonContent(`Staging host set to ${host}. WP-CLI and telemetry tools can now target 'staging'.`);
-    },
+      return jsonContent(
+        `Staging host set to ${host}. WP-CLI and telemetry tools can now target 'staging'.`
+      );
+    }
   );
 
   // ── 5. Preset & Admin ─────────────────────────────────────────────────────
 
   // ── wp_configure_preset ──
   server.tool(
-    "wp_configure_preset",
-    "Quickly configure a target WordPress site (staging/production) using a predefined preset/archetype (landing, blog, portfolio, woocommerce). WARNING: This resets the database first.",
+    'wp_configure_preset',
+    'Quickly configure a target WordPress site (staging/production) using a predefined preset/archetype (landing, blog, portfolio, woocommerce). WARNING: This resets the database first.',
     {
       target: targetSchema,
       preset: z
-        .enum(["landing", "blog", "portfolio", "woocommerce"])
-        .describe("The template preset to configure"),
-      title: z.string().optional().describe("New site title"),
-      admin_user: z.string().optional().describe("Administrator username"),
-      admin_password: z.string().optional().describe("Administrator password"),
-      admin_email: z.string().optional().describe("Administrator email"),
+        .enum(['landing', 'blog', 'portfolio', 'woocommerce'])
+        .describe('The template preset to configure'),
+      title: z.string().optional().describe('New site title'),
+      admin_user: z.string().optional().describe('Administrator username'),
+      admin_password: z.string().optional().describe('Administrator password'),
+      admin_email: z.string().optional().describe('Administrator email'),
     },
     async ({ target, preset, title, admin_user, admin_password, admin_email }) => {
       try {
@@ -281,51 +269,57 @@ export function registerWpCliTools(
       } catch (error) {
         return errorContent(`Failed to configure preset '${preset}' on ${target}: ${error}`);
       }
-    },
+    }
   );
 
   // ── wp_run_command ──
   server.tool(
-    "wp_run_command",
+    'wp_run_command',
     "Execute any arbitrary WP-CLI command on the target server (e.g. 'plugin install classic-editor --activate'). Omit 'wp' prefix from command.",
     {
       target: targetSchema,
       command: z
         .string()
-        .describe(
-          "The WP-CLI command to run (e.g. 'plugin install classic-editor --activate')",
-        ),
+        .describe("The WP-CLI command to run (e.g. 'plugin install classic-editor --activate')"),
     },
     async ({ target, command }) => {
       try {
         const result = await wpCli.runCommand(target, command);
-        return jsonContent({ target, command, exit_code: result.exitCode, stdout: result.stdout, stderr: result.stderr });
+        return jsonContent({
+          target,
+          command,
+          exit_code: result.exitCode,
+          stdout: result.stdout,
+          stderr: result.stderr,
+        });
       } catch (error) {
         return errorContent(`WP-CLI command failed on ${target}: ${error}`);
       }
-    },
+    }
   );
 
   // ── 6. Auth (Magic Link) ────────────────────────────────────────────────
 
   // ── wp_create_magic_link ──
   server.tool(
-    "wp_create_magic_link",
+    'wp_create_magic_link',
     "Generate a one-time magic login link for a specific WordPress user (e.g. 'admin') to log in without entering a password.",
     {
       target: targetSchema,
       username: z
         .string()
-        .default("admin")
-        .describe("The username to generate the magic login link for"),
+        .default('admin')
+        .describe('The username to generate the magic login link for'),
     },
     async ({ target, username }) => {
       try {
         const link = await wpCli.createMagicLink(target, username);
         return jsonContent(link);
       } catch (error) {
-        return errorContent(`Failed to create magic login link for '${username}' on ${target}: ${error}`);
+        return errorContent(
+          `Failed to create magic login link for '${username}' on ${target}: ${error}`
+        );
       }
-    },
+    }
   );
 }

@@ -4,10 +4,10 @@
 // Executes commands on remote VPS hosts via SSH.
 // Used by WP-CLI and telemetry to manage the server.
 
-import { Client } from "ssh2";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { homedir } from "node:os";
+import { Client } from 'ssh2';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { homedir } from 'node:os';
 
 /** Result of executing an SSH command */
 export interface SshCommandResult {
@@ -35,7 +35,7 @@ export class SshExecutor {
    * Resolve ~ to home directory in the private key path
    */
   private resolveKeyPath(keyPath: string): string {
-    if (keyPath.startsWith("~")) {
+    if (keyPath.startsWith('~')) {
       return resolve(homedir(), keyPath.slice(2));
     }
     return resolve(keyPath);
@@ -51,28 +51,24 @@ export class SshExecutor {
     options?: {
       host?: string;
       timeoutMs?: number;
-    },
+    }
   ): Promise<SshCommandResult> {
     const host = options?.host ?? this.config.host;
     const timeoutMs = options?.timeoutMs ?? 60_000;
 
     return new Promise((resolve, reject) => {
       const conn = new Client();
-      let stdout = "";
-      let stderr = "";
+      let stdout = '';
+      let stderr = '';
       let timedOut = false;
 
       const timer = setTimeout(() => {
         timedOut = true;
         conn.end();
-        reject(
-          new Error(
-            `SSH command timed out after ${timeoutMs}ms: ${command.slice(0, 100)}`,
-          ),
-        );
+        reject(new Error(`SSH command timed out after ${timeoutMs}ms: ${command.slice(0, 100)}`));
       }, timeoutMs);
 
-      conn.on("ready", () => {
+      conn.on('ready', () => {
         conn.exec(command, (err, stream) => {
           if (err) {
             clearTimeout(timer);
@@ -81,15 +77,15 @@ export class SshExecutor {
             return;
           }
 
-          stream.on("data", (data: Buffer) => {
+          stream.on('data', (data: Buffer) => {
             stdout += data.toString();
           });
 
-          stream.stderr.on("data", (data: Buffer) => {
+          stream.stderr.on('data', (data: Buffer) => {
             stderr += data.toString();
           });
 
-          stream.on("close", (code: number) => {
+          stream.on('close', (code: number) => {
             clearTimeout(timer);
             conn.end();
             if (!timedOut) {
@@ -103,16 +99,14 @@ export class SshExecutor {
         });
       });
 
-      conn.on("error", (err) => {
+      conn.on('error', (err) => {
         clearTimeout(timer);
         if (!timedOut) {
           reject(new Error(`SSH connection error to ${host}: ${err.message}`));
         }
       });
 
-      const privateKey = readFileSync(
-        this.resolveKeyPath(this.config.privateKeyPath),
-      );
+      const privateKey = readFileSync(this.resolveKeyPath(this.config.privateKeyPath));
 
       conn.connect({
         host,
@@ -135,9 +129,9 @@ export class SshExecutor {
       host?: string;
       timeoutMs?: number;
       user?: string;
-    },
+    }
   ): Promise<SshCommandResult> {
-    const user = options?.user ? `--user ${options.user}` : "";
+    const user = options?.user ? `--user ${options.user}` : '';
     const dockerCommand = `docker exec ${user} ${containerName} ${command}`;
     return this.execute(dockerCommand, {
       host: options?.host,
@@ -150,14 +144,14 @@ export class SshExecutor {
   async uploadFile(
     localPath: string,
     remotePath: string,
-    options?: { host?: string },
+    options?: { host?: string }
   ): Promise<void> {
     const host = options?.host ?? this.config.host;
 
     return new Promise((resolvePromise, reject) => {
       const conn = new Client();
 
-      conn.on("ready", () => {
+      conn.on('ready', () => {
         conn.sftp((err, sftp) => {
           if (err) {
             conn.end();
@@ -176,15 +170,11 @@ export class SshExecutor {
         });
       });
 
-      conn.on("error", (err) => {
-        reject(
-          new Error(`SFTP SSH connection error to ${host}: ${err.message}`),
-        );
+      conn.on('error', (err) => {
+        reject(new Error(`SFTP SSH connection error to ${host}: ${err.message}`));
       });
 
-      const privateKey = readFileSync(
-        this.resolveKeyPath(this.config.privateKeyPath),
-      );
+      const privateKey = readFileSync(this.resolveKeyPath(this.config.privateKeyPath));
 
       conn.connect({
         host,

@@ -86,7 +86,7 @@ services:
 
   # ── 3. PHP-FPM + WordPress — Compute Node ──
   vulmini_app:
-    image: wordpress:6.7-php8.3-fpm-alpine
+    image: wordpress:php8.3-fpm-alpine
     container_name: vulmini_app
     restart: always
     depends_on:
@@ -128,7 +128,7 @@ services:
   # ── 4. WP-Cron — Isolated for LearnDash ──
   # Newsletters, scheduled quizzes, drip content
   vulmini_cron:
-    image: wordpress:6.7-php8.3-fpm-alpine
+    image: wordpress:php8.3-fpm-alpine
     container_name: vulmini_cron
     restart: always
     depends_on:

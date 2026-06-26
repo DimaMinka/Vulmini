@@ -208,7 +208,7 @@ describe("Vulmini Workflow Scenarios", () => {
       const data = (await res.json()) as any;
       assert.strictEqual(data.jsonrpc, "2.0");
       assert.ok(data.result);
-      assert.strictEqual(data.result.tools.length, 22);
+      assert.strictEqual(data.result.tools.length, 23);
     }
   });
 

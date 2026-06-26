@@ -134,4 +134,29 @@ describe("Docker and SSH Integration", () => {
       /WordPress preset 'landing' configured successfully/,
     );
   });
+
+  it("should create magic login links successfully", async () => {
+    const res = await fetch("http://localhost:3000/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer my-secure-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: {
+          name: "wp_create_magic_link",
+          arguments: {
+            target: "production",
+            username: "admin",
+          },
+        },
+        id: 2,
+      }),
+    });
+    const data = (await res.json()) as any;
+    assert.ok(data.result);
+    assert.match(data.result.content[0].text, /Magic login link created/);
+  });
 });

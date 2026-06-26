@@ -206,6 +206,10 @@ const toolSchemas: Record<string, z.ZodTypeAny> = {
     admin_password: z.string().optional(),
     admin_email: z.string().optional(),
   }),
+  wp_create_magic_link: z.object({
+    target: targetSchema,
+    username: z.string().default("admin"),
+  }),
 };
 
 // SSE clients list
@@ -1055,6 +1059,11 @@ export function createServer() {
 
       case "wp_configure_preset": {
         resultText = `WordPress preset '${validatedArgs.preset}' configured successfully!\n\nExecution log:\nwp theme install ${validatedArgs.preset === "blog" ? "generatepress" : validatedArgs.preset === "portfolio" ? "oceanwp" : "astra"} --activate -> Success\nwp plugin install elementor --activate -> Success`;
+        break;
+      }
+
+      case "wp_create_magic_link": {
+        resultText = `Success: Magic login link created!\nhttps://example.com/magic-login-token-12345`;
         break;
       }
     }

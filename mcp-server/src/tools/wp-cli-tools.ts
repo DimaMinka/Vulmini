@@ -438,4 +438,40 @@ export function registerWpCliTools(
       }
     },
   );
+
+  // ── wp_create_magic_link ──
+  server.tool(
+    "wp_create_magic_link",
+    "Generate a one-time magic login link for a specific WordPress user (e.g. 'admin') to log in without entering a password.",
+    {
+      target: targetSchema,
+      username: z
+        .string()
+        .default("admin")
+        .describe("The username to generate the magic login link for"),
+    },
+    async ({ target, username }) => {
+      try {
+        const link = await wpCli.createMagicLink(target, username);
+        return {
+          content: [
+            {
+              type: "text",
+              text: link,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to create magic login link for '${username}' on ${target}: ${error}`,
+            },
+          ],
+        };
+      }
+    },
+  );
 }

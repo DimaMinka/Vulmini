@@ -298,19 +298,25 @@ export class WpCliService {
     const adminPassword = options.adminPassword || "VulminiAdminSecurePass123!";
     const adminEmail = options.adminEmail || "admin@example.com";
 
-    // 1. Get current site URL before reset
-    let siteUrl = "http://localhost";
+    // 1. Get current site URL before reset, fallback to DOMAIN_NAME from env
+    let siteUrl = process.env.DOMAIN_NAME
+      ? `https://${process.env.DOMAIN_NAME}`
+      : "http://localhost";
     try {
       const urlRes = await this.ssh.executeInContainer(
         this.containerName,
         "wp option get siteurl --allow-root",
         { host },
       );
-      if (urlRes.exitCode === 0 && urlRes.stdout.trim()) {
+      if (
+        urlRes.exitCode === 0 &&
+        urlRes.stdout.trim() &&
+        !urlRes.stdout.includes("localhost")
+      ) {
         siteUrl = urlRes.stdout.trim();
       }
     } catch {
-      // Ignore and use default
+      // Ignore and use default/env fallback
     }
 
     try {
@@ -334,6 +340,25 @@ export class WpCliService {
       );
       if (installRes.exitCode !== 0) {
         throw new Error(`WordPress core install failed: ${installRes.stderr}`);
+      }
+
+      // 3.5 Install WP-CLI Login Package and Server Companion (Magic Link support)
+      try {
+        console.log(`[Vulmini] Installing WP-CLI Login Package...`);
+        await this.ssh.executeInContainer(
+          this.containerName,
+          "wp package install aaemnnosttv/wp-cli-login-command --allow-root",
+          { host },
+        );
+        await this.ssh.executeInContainer(
+          this.containerName,
+          "wp login install --activate --allow-root",
+          { host },
+        );
+      } catch (pkgErr) {
+        console.warn(
+          `[Vulmini] Warning: Failed to install WP-CLI login command helper: ${pkgErr}`,
+        );
       }
 
       // 4. Configure specific preset
@@ -462,4 +487,22 @@ export class WpCliService {
       throw err;
     }
   }
+
+  /** Create a magic login link for a specific user */
+  async createMagicLink(
+    target: ServerTarget,
+    username = "admin",
+  ): Promise<string> {
+    const host = this.getHost(target);
+    const result = await this.ssh.executeInContainer(
+      this.containerName,
+      `wp login create ${username} --allow-root`,
+      { host },
+    );
+    if (result.exitCode !== 0) {
+      throw new Error(`Failed to create magic link: ${result.stderr}`);
+    }
+    return result.stdout.trim();
+  }
 }
+

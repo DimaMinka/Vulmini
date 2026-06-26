@@ -3,13 +3,33 @@
 // ==========================================
 // Tools for Gemini: WordPress management
 // via WP-CLI inside the Docker container.
+//
+// Sections:
+//   1. Plugin Management
+//   2. Database & Health
+//   3. Backup & Restore
+//   4. Server Setup
+//   5. Preset & Admin
+//   6. Auth (Magic Link)
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import type { WpCliService } from "../services/wp-cli.js";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import type { WpCliService } from '../services/wp-cli.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { targetSchema } from '../utils/tool-schema.js';
+
+/** Wrap any value as MCP tool text content. */
+function jsonContent(data: unknown): { content: [{ type: 'text'; text: string }] } {
+  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  return { content: [{ type: 'text' as const, text }] };
+}
+
+/** Wrap an error string as a failed MCP tool response. */
+function errorContent(message: string): { isError: true; content: [{ type: 'text'; text: string }] } {
+  return { isError: true as const, content: [{ type: 'text' as const, text: message }] };
+}
 
 function getEnvPath(dirname: string): string {
   const paths = [
@@ -24,14 +44,14 @@ function getEnvPath(dirname: string): string {
   return paths[0];
 }
 
-const targetSchema = z
-  .enum(["production", "staging"])
-  .describe("Target server: 'production' or 'staging'");
+
 
 export function registerWpCliTools(
   server: McpServer,
   wpCli: WpCliService,
 ): void {
+  // ── 1. Plugin Management ────────────────────────────────────────────────────
+
   // ── wp_plugin_status ──
   server.tool(
     "wp_plugin_status",
@@ -42,33 +62,15 @@ export function registerWpCliTools(
     async ({ target }) => {
       try {
         const plugins = await wpCli.getPluginStatus(target);
-        const updatesAvailable = plugins.filter(
-          (p) => p.update === "available",
-        );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  total_plugins: plugins.length,
-                  updates_available: updatesAvailable.length,
-                  plugins_with_updates: updatesAvailable,
-                  all_plugins: plugins,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        const updatesAvailable = plugins.filter((p) => p.update === 'available');
+        return jsonContent({
+          total_plugins: plugins.length,
+          updates_available: updatesAvailable.length,
+          plugins_with_updates: updatesAvailable,
+          all_plugins: plugins,
+        });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Failed to get plugin status: ${error}` },
-          ],
-        };
+        return errorContent(`Failed to get plugin status: ${error}`);
       }
     },
   );
@@ -89,37 +91,19 @@ export function registerWpCliTools(
     async ({ target, plugin_slug }) => {
       try {
         const output = await wpCli.updatePlugins(target, plugin_slug);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  target,
-                  plugin: plugin_slug ?? "ALL",
-                  output,
-                  message:
-                    "Update completed. Run wp_health_check to verify the site is healthy.",
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent({
+          target,
+          plugin: plugin_slug ?? 'ALL',
+          output,
+          message: 'Update completed. Run wp_health_check to verify the site is healthy.',
+        });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `Plugin update failed on ${target}: ${error}`,
-            },
-          ],
-        };
+        return errorContent(`Plugin update failed on ${target}: ${error}`);
       }
     },
   );
+
+  // ── 2. Database & Health ──────────────────────────────────────────────────
 
   // ── wp_db_migrate ──
   server.tool(
@@ -131,33 +115,13 @@ export function registerWpCliTools(
     async ({ target }) => {
       try {
         const output = await wpCli.runDbMigration(target);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  target,
-                  output,
-                  message:
-                    "Database migration complete. Run wp_health_check to verify.",
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent({
+          target,
+          output,
+          message: 'Database migration complete. Run wp_health_check to verify.',
+        });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `DB migration failed on ${target}: ${error}`,
-            },
-          ],
-        };
+        return errorContent(`DB migration failed on ${target}: ${error}`);
       }
     },
   );
@@ -172,27 +136,14 @@ export function registerWpCliTools(
     async ({ target }) => {
       try {
         const health = await wpCli.healthCheck(target);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(health, null, 2),
-            },
-          ],
-        };
+        return jsonContent(health);
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `Health check failed on ${target}: ${error}`,
-            },
-          ],
-        };
+        return errorContent(`Health check failed on ${target}: ${error}`);
       }
     },
   );
+
+  // ── 3. Backup & Restore ──────────────────────────────────────────────────
 
   // ── wp_run_backup ──
   server.tool(
@@ -214,31 +165,14 @@ export function registerWpCliTools(
     async ({ target, scope, plugin_slug }) => {
       try {
         const output = await wpCli.runBackup(target, scope, plugin_slug);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  target,
-                  scope,
-                  output,
-                  message:
-                    "Backup created. Save the backup_id for potential rollback with wp_run_restore.",
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent({
+          target,
+          scope,
+          output,
+          message: 'Backup created. Save the backup_id for potential rollback with wp_run_restore.',
+        });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Backup failed on ${target}: ${error}` },
-          ],
-        };
+        return errorContent(`Backup failed on ${target}: ${error}`);
       }
     },
   );
@@ -262,35 +196,20 @@ export function registerWpCliTools(
     async ({ target, backup_id, scope }) => {
       try {
         const output = await wpCli.runRestore(target, backup_id, scope);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  target,
-                  backup_id,
-                  scope,
-                  output,
-                  message:
-                    "Restore completed. Run wp_health_check to verify the site is healthy again.",
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent({
+          target,
+          backup_id,
+          scope,
+          output,
+          message: 'Restore completed. Run wp_health_check to verify the site is healthy again.',
+        });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Restore failed on ${target}: ${error}` },
-          ],
-        };
+        return errorContent(`Restore failed on ${target}: ${error}`);
       }
     },
   );
+
+  // ── 4. Server Setup ───────────────────────────────────────────────────────
 
   // ── set_staging_host ──
   server.tool(
@@ -329,16 +248,11 @@ export function registerWpCliTools(
         );
       }
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Staging host set to ${host}. WP-CLI and telemetry tools can now target 'staging'.`,
-          },
-        ],
-      };
+      return jsonContent(`Staging host set to ${host}. WP-CLI and telemetry tools can now target 'staging'.`);
     },
   );
+
+  // ── 5. Preset & Admin ─────────────────────────────────────────────────────
 
   // ── wp_configure_preset ──
   server.tool(
@@ -354,14 +268,7 @@ export function registerWpCliTools(
       admin_password: z.string().optional().describe("Administrator password"),
       admin_email: z.string().optional().describe("Administrator email"),
     },
-    async ({
-      target,
-      preset,
-      title,
-      admin_user,
-      admin_password,
-      admin_email,
-    }) => {
+    async ({ target, preset, title, admin_user, admin_password, admin_email }) => {
       try {
         const result = await wpCli.configurePreset(target, {
           preset,
@@ -370,24 +277,9 @@ export function registerWpCliTools(
           adminPassword: admin_password,
           adminEmail: admin_email,
         });
-        return {
-          content: [
-            {
-              type: "text",
-              text: result,
-            },
-          ],
-        };
+        return jsonContent(result);
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `Failed to configure preset '${preset}' on ${target}: ${error}`,
-            },
-          ],
-        };
+        return errorContent(`Failed to configure preset '${preset}' on ${target}: ${error}`);
       }
     },
   );
@@ -407,37 +299,14 @@ export function registerWpCliTools(
     async ({ target, command }) => {
       try {
         const result = await wpCli.runCommand(target, command);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  target,
-                  command,
-                  exit_code: result.exitCode,
-                  stdout: result.stdout,
-                  stderr: result.stderr,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent({ target, command, exit_code: result.exitCode, stdout: result.stdout, stderr: result.stderr });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `WP-CLI command failed on ${target}: ${error}`,
-            },
-          ],
-        };
+        return errorContent(`WP-CLI command failed on ${target}: ${error}`);
       }
     },
   );
+
+  // ── 6. Auth (Magic Link) ────────────────────────────────────────────────
 
   // ── wp_create_magic_link ──
   server.tool(
@@ -453,24 +322,9 @@ export function registerWpCliTools(
     async ({ target, username }) => {
       try {
         const link = await wpCli.createMagicLink(target, username);
-        return {
-          content: [
-            {
-              type: "text",
-              text: link,
-            },
-          ],
-        };
+        return jsonContent(link);
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `Failed to create magic login link for '${username}' on ${target}: ${error}`,
-            },
-          ],
-        };
+        return errorContent(`Failed to create magic login link for '${username}' on ${target}: ${error}`);
       }
     },
   );

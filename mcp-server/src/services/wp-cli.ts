@@ -4,6 +4,8 @@
 // Wrapper for WP-CLI to execute WordPress commands
 // via SSH inside the vulmini_app Docker container.
 
+import fs from "node:fs";
+import path from "node:path";
 import type { SshExecutor, SshCommandResult } from "./ssh-executor.js";
 import type {
   WpPlugin,
@@ -47,15 +49,56 @@ export class WpCliService {
    * Resolve target to SSH host
    */
   private getHost(target: ServerTarget): string {
+    try {
+      const paths = [
+        path.resolve(process.cwd(), ".env"),
+        path.resolve(process.cwd(), "../.env"),
+        "/var/www/vulmini-mcp/.env",
+      ];
+      let envPath = "";
+      for (const p of paths) {
+        if (fs.existsSync(p)) {
+          envPath = p;
+          break;
+        }
+      }
+      if (envPath) {
+        const envContent = fs.readFileSync(envPath, "utf-8");
+        envContent.split(/\r?\n/).forEach((line) => {
+          const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+          if (match) {
+            const key = match[1];
+            let value = match[2] || "";
+            if (value.startsWith('"') && value.endsWith('"')) {
+              value = value.slice(1, -1);
+            } else if (value.startsWith("'") && value.endsWith("'")) {
+              value = value.slice(1, -1);
+            }
+            process.env[key] = value.trim();
+          }
+        });
+      }
+    } catch (e) {
+      console.error("[Vulmini] Error reloading .env in getHost:", e);
+    }
+
     if (target === "staging") {
-      if (!this.targets.staging) {
+      const stagingHost = process.env.VULMINI_STAGING_HOST;
+      if (!stagingHost) {
         throw new Error(
           "Staging host not set. Create an ephemeral staging instance first.",
         );
       }
-      return this.targets.staging;
+      return stagingHost;
     }
-    return this.targets.production;
+    
+    const prodHost = process.env.SSH_HOST;
+    if (!prodHost) {
+      throw new Error(
+        "Production host not configured under SSH_HOST in .env",
+      );
+    }
+    return prodHost;
   }
 
   /**
@@ -238,5 +281,185 @@ export class WpCliService {
       throw new Error(`Restore failed: ${result.stderr}\n${result.stdout}`);
     }
     return result.stdout;
+  }
+
+  /** Configure a WordPress site with a predefined preset/archetype */
+  async configurePreset(
+    target: ServerTarget,
+    options: {
+      preset: "landing" | "blog" | "portfolio" | "woocommerce";
+      title?: string;
+      adminUser?: string;
+      adminPassword?: string;
+      adminEmail?: string;
+    },
+  ): Promise<string> {
+    const host = this.getHost(target);
+    const title = options.title || "Vulmini WordPress Site";
+    const adminUser = options.adminUser || "admin";
+    const adminPassword = options.adminPassword || "VulminiAdminSecurePass123!";
+    const adminEmail = options.adminEmail || "admin@example.com";
+
+    // 1. Get current site URL before reset
+    let siteUrl = "http://localhost";
+    try {
+      const urlRes = await this.ssh.executeInContainer(
+        this.containerName,
+        "wp option get siteurl --allow-root",
+        { host },
+      );
+      if (urlRes.exitCode === 0 && urlRes.stdout.trim()) {
+        siteUrl = urlRes.stdout.trim();
+      }
+    } catch {
+      // Ignore and use default
+    }
+
+    try {
+      // 2. Reset database
+      console.log(`[Vulmini] Resetting database on target ${target}...`);
+      const resetRes = await this.ssh.executeInContainer(
+        this.containerName,
+        "wp db reset --yes --allow-root",
+        { host },
+      );
+      if (resetRes.exitCode !== 0) {
+        throw new Error(`Database reset failed: ${resetRes.stderr}`);
+      }
+
+      // 3. Reinstall WordPress core
+      console.log(`[Vulmini] Reinstalling WordPress core...`);
+      const installRes = await this.ssh.executeInContainer(
+        this.containerName,
+        `wp core install --url="${siteUrl}" --title="${title}" --admin_user="${adminUser}" --admin_password="${adminPassword}" --admin_email="${adminEmail}" --skip-email --allow-root`,
+        { host },
+      );
+      if (installRes.exitCode !== 0) {
+        throw new Error(`WordPress core install failed: ${installRes.stderr}`);
+      }
+
+      // 4. Configure specific preset
+      console.log(`[Vulmini] Running preset configuration: ${options.preset}...`);
+      let presetLogs = "";
+
+      if (options.preset === "landing") {
+        const cmds = [
+          "theme install astra --activate",
+          "plugin install elementor --activate",
+          "plugin install wpforms-lite --activate",
+          "rewrite structure '/%postname%/'",
+          "post create --post_type=page --post_title='Home' --post_status=publish --post_name=home --post_content='Welcome to our landing page!'",
+          "option update show_on_front page",
+        ];
+        for (const cmd of cmds) {
+          const res = await this.ssh.executeInContainer(
+            this.containerName,
+            `wp ${cmd} --allow-root`,
+            { host },
+          );
+          if (res.exitCode !== 0) {
+            throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
+          }
+          presetLogs += `wp ${cmd} -> Success\n`;
+        }
+        // Set page_on_front to the ID of the new Home page
+        const homeIdRes = await this.ssh.executeInContainer(
+          this.containerName,
+          "wp post list --post_type=page --name=home --field=ID --allow-root",
+          { host },
+        );
+        const homeId = homeIdRes.stdout.trim();
+        if (homeId) {
+          await this.ssh.executeInContainer(
+            this.containerName,
+            `wp option update page_on_front ${homeId} --allow-root`,
+            { host },
+          );
+        }
+      } else if (options.preset === "blog") {
+        const cmds = [
+          "theme install generatepress --activate",
+          "plugin install classic-editor --activate",
+          "plugin install wp-super-cache --activate",
+          "rewrite structure '/%postname%/'",
+          "option update show_on_front posts",
+        ];
+        for (const cmd of cmds) {
+          const res = await this.ssh.executeInContainer(
+            this.containerName,
+            `wp ${cmd} --allow-root`,
+            { host },
+          );
+          if (res.exitCode !== 0) {
+            throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
+          }
+          presetLogs += `wp ${cmd} -> Success\n`;
+        }
+      } else if (options.preset === "portfolio") {
+        const cmds = [
+          "theme install oceanwp --activate",
+          "plugin install elementor --activate",
+          "rewrite structure '/%postname%/'",
+          "post create --post_type=page --post_title='Home' --post_status=publish --post_name=home",
+          "post create --post_type=page --post_title='Portfolio' --post_status=publish --post_name=portfolio",
+          "post create --post_type=page --post_title='Contact' --post_status=publish --post_name=contact",
+          "option update show_on_front page",
+        ];
+        for (const cmd of cmds) {
+          const res = await this.ssh.executeInContainer(
+            this.containerName,
+            `wp ${cmd} --allow-root`,
+            { host },
+          );
+          if (res.exitCode !== 0) {
+            throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
+          }
+          presetLogs += `wp ${cmd} -> Success\n`;
+        }
+        const homeIdRes = await this.ssh.executeInContainer(
+          this.containerName,
+          "wp post list --post_type=page --name=home --field=ID --allow-root",
+          { host },
+        );
+        const homeId = homeIdRes.stdout.trim();
+        if (homeId) {
+          await this.ssh.executeInContainer(
+            this.containerName,
+            `wp option update page_on_front ${homeId} --allow-root`,
+            { host },
+          );
+        }
+      } else if (options.preset === "woocommerce") {
+        const cmds = [
+          "theme install astra --activate",
+          "plugin install woocommerce --activate",
+          "rewrite structure '/%postname%/'",
+        ];
+        for (const cmd of cmds) {
+          const res = await this.ssh.executeInContainer(
+            this.containerName,
+            `wp ${cmd} --allow-root`,
+            { host },
+          );
+          if (res.exitCode !== 0) {
+            throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
+          }
+          presetLogs += `wp ${cmd} -> Success\n`;
+        }
+      }
+
+      return `WordPress preset '${options.preset}' configured successfully!\n\nExecution log:\n${presetLogs}`;
+    } catch (err) {
+      console.error(
+        `[Vulmini] Error applying preset: ${err}. Resetting DB to clean state...`,
+      );
+      // Rollback database to clean reset state
+      await this.ssh.executeInContainer(
+        this.containerName,
+        "wp db reset --yes --allow-root",
+        { host },
+      );
+      throw err;
+    }
   }
 }

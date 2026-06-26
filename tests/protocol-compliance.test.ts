@@ -37,7 +37,7 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
     assert.strictEqual(data.id, 10);
     assert.ok(data.result);
     assert.ok(Array.isArray(data.result.tools));
-    assert.strictEqual(data.result.tools.length, 21);
+    assert.strictEqual(data.result.tools.length, 22);
     const toolNames = data.result.tools.map((t: any) => t.name);
     assert.ok(toolNames.includes("list_instances"));
     assert.ok(toolNames.includes("wp_plugin_status"));

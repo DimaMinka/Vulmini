@@ -153,6 +153,14 @@ const toolSchemas: Record<string, z.ZodTypeAny> = {
   }),
   deploy_stack: z.object({
     target: targetSchema
+  }),
+  wp_configure_preset: z.object({
+    target: targetSchema,
+    preset: z.enum(["landing", "blog", "portfolio", "woocommerce"]),
+    title: z.string().optional(),
+    admin_user: z.string().optional(),
+    admin_password: z.string().optional(),
+    admin_email: z.string().optional()
   })
 };
 
@@ -829,6 +837,11 @@ export function createServer() {
 
       case "deploy_stack": {
         resultText = `Docker Stack deployed successfully to ${validatedArgs.target} (${validatedArgs.target === "production" ? "192.0.2.1" : stagingHost || "192.0.2.2"})!`;
+        break;
+      }
+
+      case "wp_configure_preset": {
+        resultText = `WordPress preset '${validatedArgs.preset}' configured successfully!\n\nExecution log:\nwp theme install ${validatedArgs.preset === "blog" ? "generatepress" : validatedArgs.preset === "portfolio" ? "oceanwp" : "astra"} --activate -> Success\nwp plugin install elementor --activate -> Success`;
         break;
       }
     }

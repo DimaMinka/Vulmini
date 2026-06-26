@@ -57,7 +57,7 @@ try {
 
   // Tar essential files
   execSync(
-    `tar -czf ${tarFile} dist package.json package-lock.json .env.prod`,
+    `tar -czf ${tarFile} dist package.json package-lock.json .env.prod -C .. docker-compose.yml nginx php scripts`,
     { cwd: __dirname, stdio: "inherit" },
   );
 

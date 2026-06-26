@@ -340,6 +340,63 @@ export function registerWpCliTools(
     },
   );
 
+  // ── wp_configure_preset ──
+  server.tool(
+    "wp_configure_preset",
+    "Quickly configure a target WordPress site (staging/production) using a predefined preset/archetype (landing, blog, portfolio, woocommerce). WARNING: This resets the database first.",
+    {
+      target: targetSchema,
+      preset: z
+        .enum(["landing", "blog", "portfolio", "woocommerce"])
+        .describe("The template preset to configure"),
+      title: z
+        .string()
+        .optional()
+        .describe("New site title"),
+      admin_user: z
+        .string()
+        .optional()
+        .describe("Administrator username"),
+      admin_password: z
+        .string()
+        .optional()
+        .describe("Administrator password"),
+      admin_email: z
+        .string()
+        .optional()
+        .describe("Administrator email"),
+    },
+    async ({ target, preset, title, admin_user, admin_password, admin_email }) => {
+      try {
+        const result = await wpCli.configurePreset(target, {
+          preset,
+          title,
+          adminUser: admin_user,
+          adminPassword: admin_password,
+          adminEmail: admin_email,
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: result,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to configure preset '${preset}' on ${target}: ${error}`,
+            },
+          ],
+        };
+      }
+    },
+  );
+
   // ── wp_run_command ──
   server.tool(
     "wp_run_command",

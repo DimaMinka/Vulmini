@@ -392,9 +392,12 @@ export function registerVultrTools(
         }
 
         // 2. Create Instance
+        const plan = getEnvVal("VULTR_PROD_PLAN") || defaultConfig.plan;
+        const region = getEnvVal("VULTR_PROD_REGION") || defaultConfig.region || "tlv";
+
         const instance = await vultr.createInstance({
-          region: defaultConfig.region,
-          plan: defaultConfig.plan,
+          region: region,
+          plan: plan,
           os_id: 2284, // Ubuntu 24.04
           label: "vulmini-prod",
           hostname: "vulmini-prod",

@@ -118,30 +118,30 @@ registerWpCliTools(server, wpCli);
 
 // 3. Telemetry tools (system health, logs, Docker status)
 registerTelemetryTools(server, ssh, (target) => {
-  if (target === "staging") {
-    try {
-      const __dirname = path.dirname(fileURLToPath(import.meta.url));
-      const envPath = path.resolve(__dirname, "../../.env");
-      if (fs.existsSync(envPath)) {
-        const envContent = fs.readFileSync(envPath, "utf-8");
-        envContent.split(/\r?\n/).forEach((line) => {
-          const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-          if (match) {
-            const key = match[1];
-            let value = match[2] || "";
-            if (value.startsWith('"') && value.endsWith('"')) {
-              value = value.slice(1, -1);
-            } else if (value.startsWith("'") && value.endsWith("'")) {
-              value = value.slice(1, -1);
-            }
-            process.env[key] = value.trim();
+  try {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const envPath = path.resolve(__dirname, "../../.env");
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, "utf-8");
+      envContent.split(/\r?\n/).forEach((line) => {
+        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+        if (match) {
+          const key = match[1];
+          let value = match[2] || "";
+          if (value.startsWith('"') && value.endsWith('"')) {
+            value = value.slice(1, -1);
+          } else if (value.startsWith("'") && value.endsWith("'")) {
+            value = value.slice(1, -1);
           }
-        });
-      }
-    } catch (e) {
-      console.error("[Vulmini] Error reloading .env file:", e);
+          process.env[key] = value.trim();
+        }
+      });
     }
+  } catch (e) {
+    console.error("[Vulmini] Error reloading .env file:", e);
+  }
 
+  if (target === "staging") {
     const stagingHost = process.env.VULMINI_STAGING_HOST;
     if (!stagingHost) {
       throw new Error(
@@ -150,7 +150,13 @@ registerTelemetryTools(server, ssh, (target) => {
     }
     return stagingHost;
   }
-  return sshHost;
+  const prodHost = process.env.SSH_HOST;
+  if (!prodHost) {
+    throw new Error(
+      "Production host not configured under SSH_HOST in .env",
+    );
+  }
+  return prodHost;
 });
 
 // ── Connect Server ──

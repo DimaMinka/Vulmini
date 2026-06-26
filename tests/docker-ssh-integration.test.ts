@@ -89,4 +89,32 @@ describe("Docker and SSH Integration", () => {
     assert.strictEqual(result.lines_requested, 50);
     assert.match(result.log_content, /Nginx/);
   });
+
+  it("should configure WordPress presets successfully", async () => {
+    const res = await fetch("http://localhost:3000/mcp", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer my-secure-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: {
+          name: "wp_configure_preset",
+          arguments: {
+            target: "production",
+            preset: "landing",
+            title: "Test Site",
+            admin_user: "dev",
+            admin_password: "SecurePassword123!"
+          }
+        },
+        id: 1
+      })
+    });
+    const data = await res.json() as any;
+    assert.ok(data.result);
+    assert.match(data.result.content[0].text, /WordPress preset 'landing' configured successfully/);
+  });
 });

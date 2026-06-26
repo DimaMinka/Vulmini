@@ -3,14 +3,32 @@
 // ==========================================
 // Tools for Gemini: VPS and snapshot management
 // via Vultr API v2. Core of the "Twin-Instance" pattern.
+//
+// Sections:
+//   1. Instance Management
+//   2. Snapshot Management
+//   3. Ephemeral Staging
+//   4. Production VPS Provisioning
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import type { VultrApiClient } from "../services/vultr-api.js";
-import fs from "node:fs";
-import path from "node:path";
-import { homedir } from "node:os";
-import { fileURLToPath } from "node:url";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import type { VultrApiClient } from '../services/vultr-api.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { instanceIdSchema, snapshotIdSchema } from '../utils/tool-schema.js';
+
+/** Wrap any value as MCP tool text content. */
+function jsonContent(data: unknown): { content: [{ type: 'text'; text: string }] } {
+  const text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  return { content: [{ type: 'text' as const, text }] };
+}
+
+/** Wrap an error string as a failed MCP tool response. */
+function errorContent(message: string): { isError: true; content: [{ type: 'text'; text: string }] } {
+  return { isError: true as const, content: [{ type: 'text' as const, text: message }] };
+}
 
 function getEnvPath(dirname: string): string {
   const paths = [
@@ -30,6 +48,8 @@ export function registerVultrTools(
   vultr: VultrApiClient,
   defaultConfig: { region: string; plan: string },
 ): void {
+  // ── 1. Instance Management ───────────────────────────────────────────────────
+
   // ── list_instances ──
   server.tool(
     "list_instances",
@@ -38,34 +58,20 @@ export function registerVultrTools(
     async () => {
       try {
         const instances = await vultr.listInstances();
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                instances.map((i) => ({
-                  id: i.id,
-                  label: i.label,
-                  ip: i.main_ip,
-                  region: i.region,
-                  plan: i.plan,
-                  status: i.status,
-                  power: i.power_status,
-                  tags: i.tags,
-                })),
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent(
+          instances.map((i) => ({
+            id: i.id,
+            label: i.label,
+            ip: i.main_ip,
+            region: i.region,
+            plan: i.plan,
+            status: i.status,
+            power: i.power_status,
+            tags: i.tags,
+          }))
+        );
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Failed to list instances: ${error}` },
-          ],
-        };
+        return errorContent(`Failed to list instances: ${error}`);
       }
     },
   );
@@ -91,6 +97,8 @@ export function registerVultrTools(
       }
     },
   );
+
+  // ── 2. Snapshot Management ────────────────────────────────────────────────
 
   // ── create_snapshot ──
   server.tool(
@@ -173,6 +181,8 @@ export function registerVultrTools(
       }
     },
   );
+
+  // ── 3. Ephemeral Staging ───────────────────────────────────────────────────
 
   // ── create_ephemeral_staging ──
   server.tool(
@@ -322,6 +332,8 @@ export function registerVultrTools(
       }
     },
   );
+
+  // ── 4. Production VPS Provisioning ───────────────────────────────────────────
 
   // ── create_production_vps ──
   server.tool(

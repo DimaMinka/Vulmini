@@ -3,6 +3,15 @@
 // ==========================================
 // Wrapper for WP-CLI to execute WordPress commands
 // via SSH inside the vulmini_app Docker container.
+//
+// Sections:
+//   1. Constructor & Host Resolution
+//   2. Core Command Execution
+//   3. Plugin Management
+//   4. Database & Health
+//   5. Backup & Restore
+//   6. Preset Configuration
+//   7. Magic Link & Auth
 
 import fs from "node:fs";
 import path from "node:path";
@@ -24,7 +33,9 @@ export interface TargetHostMap {
 export class WpCliService {
   private ssh: SshExecutor;
   private targets: TargetHostMap;
-  private containerName = "vulmini_app";
+  private containerName = 'vulmini_app';
+
+  // ── 1. Constructor & Host Resolution ──────────────────────────────────────
 
   constructor(ssh: SshExecutor, targets: TargetHostMap) {
     this.ssh = ssh;
@@ -128,7 +139,11 @@ export class WpCliService {
     return this.runCommand(target, command, timeoutMs);
   }
 
-  // ── Plugin Management ──
+  // ── 2. Core Command Execution ─────────────────────────────────────────────
+
+  // (runCommand and wp methods above)
+
+  // ── 3. Plugin Management ──────────────────────────────────────────────────
 
   /** Get list of all plugins with their status and updates */
   async getPluginStatus(target: ServerTarget): Promise<WpPlugin[]> {
@@ -161,7 +176,7 @@ export class WpCliService {
     return result.stdout;
   }
 
-  // ── Database Migration ──
+  // ── 4. Database & Health ──────────────────────────────────────────────────
 
   /** Run WordPress core database migration + LearnDash data upgrades */
   async runDbMigration(target: ServerTarget): Promise<string> {
@@ -240,7 +255,7 @@ export class WpCliService {
     };
   }
 
-  // ── Backup / Restore ──
+  // ── 5. Backup & Restore ───────────────────────────────────────────────────
 
   /** Run backup script on the target server */
   async runBackup(
@@ -279,6 +294,51 @@ export class WpCliService {
       throw new Error(`Restore failed: ${result.stderr}\n${result.stdout}`);
     }
     return result.stdout;
+  }
+
+  // ── 6. Preset Configuration ───────────────────────────────────────────────
+
+  /**
+   * Run a list of WP-CLI commands inside the container, accumulating a log.
+   * Throws on first non-zero exit code.
+   */
+  private async runWpCommands(
+    host: string,
+    commands: string[],
+  ): Promise<string> {
+    let log = '';
+    for (const cmd of commands) {
+      const res = await this.ssh.executeInContainer(
+        this.containerName,
+        `wp ${cmd} --allow-root`,
+        { host },
+      );
+      if (res.exitCode !== 0) {
+        throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
+      }
+      log += `wp ${cmd} -> Success\n`;
+    }
+    return log;
+  }
+
+  /**
+   * Set the WordPress front page to the first page matching the given slug.
+   * Silently skips if no page is found.
+   */
+  private async setFrontPage(host: string, slug: string): Promise<void> {
+    const res = await this.ssh.executeInContainer(
+      this.containerName,
+      `wp post list --post_type=page --name=${slug} --field=ID --allow-root`,
+      { host },
+    );
+    const id = res.stdout.trim();
+    if (id) {
+      await this.ssh.executeInContainer(
+        this.containerName,
+        `wp option update page_on_front ${id} --allow-root`,
+        { host },
+      );
+    }
   }
 
   /** Configure a WordPress site with a predefined preset/archetype */
@@ -367,110 +427,41 @@ export class WpCliService {
       );
       let presetLogs = "";
 
-      if (options.preset === "landing") {
-        const cmds = [
-          "theme install astra --activate",
-          "plugin install elementor --activate",
-          "plugin install wpforms-lite --activate",
+      if (options.preset === 'landing') {
+        presetLogs += await this.runWpCommands(host, [
+          'theme install astra --activate',
+          'plugin install elementor --activate',
+          'plugin install wpforms-lite --activate',
           "rewrite structure '/%postname%/'",
           "post create --post_type=page --post_title='Home' --post_status=publish --post_name=home --post_content='Welcome to our landing page!'",
-          "option update show_on_front page",
-        ];
-        for (const cmd of cmds) {
-          const res = await this.ssh.executeInContainer(
-            this.containerName,
-            `wp ${cmd} --allow-root`,
-            { host },
-          );
-          if (res.exitCode !== 0) {
-            throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
-          }
-          presetLogs += `wp ${cmd} -> Success\n`;
-        }
-        // Set page_on_front to the ID of the new Home page
-        const homeIdRes = await this.ssh.executeInContainer(
-          this.containerName,
-          "wp post list --post_type=page --name=home --field=ID --allow-root",
-          { host },
-        );
-        const homeId = homeIdRes.stdout.trim();
-        if (homeId) {
-          await this.ssh.executeInContainer(
-            this.containerName,
-            `wp option update page_on_front ${homeId} --allow-root`,
-            { host },
-          );
-        }
-      } else if (options.preset === "blog") {
-        const cmds = [
-          "theme install generatepress --activate",
-          "plugin install classic-editor --activate",
-          "plugin install wp-super-cache --activate",
+          'option update show_on_front page',
+        ]);
+        await this.setFrontPage(host, 'home');
+      } else if (options.preset === 'blog') {
+        presetLogs += await this.runWpCommands(host, [
+          'theme install generatepress --activate',
+          'plugin install classic-editor --activate',
+          'plugin install wp-super-cache --activate',
           "rewrite structure '/%postname%/'",
-          "option update show_on_front posts",
-        ];
-        for (const cmd of cmds) {
-          const res = await this.ssh.executeInContainer(
-            this.containerName,
-            `wp ${cmd} --allow-root`,
-            { host },
-          );
-          if (res.exitCode !== 0) {
-            throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
-          }
-          presetLogs += `wp ${cmd} -> Success\n`;
-        }
-      } else if (options.preset === "portfolio") {
-        const cmds = [
-          "theme install oceanwp --activate",
-          "plugin install elementor --activate",
+          'option update show_on_front posts',
+        ]);
+      } else if (options.preset === 'portfolio') {
+        presetLogs += await this.runWpCommands(host, [
+          'theme install oceanwp --activate',
+          'plugin install elementor --activate',
           "rewrite structure '/%postname%/'",
           "post create --post_type=page --post_title='Home' --post_status=publish --post_name=home",
           "post create --post_type=page --post_title='Portfolio' --post_status=publish --post_name=portfolio",
           "post create --post_type=page --post_title='Contact' --post_status=publish --post_name=contact",
-          "option update show_on_front page",
-        ];
-        for (const cmd of cmds) {
-          const res = await this.ssh.executeInContainer(
-            this.containerName,
-            `wp ${cmd} --allow-root`,
-            { host },
-          );
-          if (res.exitCode !== 0) {
-            throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
-          }
-          presetLogs += `wp ${cmd} -> Success\n`;
-        }
-        const homeIdRes = await this.ssh.executeInContainer(
-          this.containerName,
-          "wp post list --post_type=page --name=home --field=ID --allow-root",
-          { host },
-        );
-        const homeId = homeIdRes.stdout.trim();
-        if (homeId) {
-          await this.ssh.executeInContainer(
-            this.containerName,
-            `wp option update page_on_front ${homeId} --allow-root`,
-            { host },
-          );
-        }
-      } else if (options.preset === "woocommerce") {
-        const cmds = [
-          "theme install astra --activate",
-          "plugin install woocommerce --activate",
+          'option update show_on_front page',
+        ]);
+        await this.setFrontPage(host, 'home');
+      } else if (options.preset === 'woocommerce') {
+        presetLogs += await this.runWpCommands(host, [
+          'theme install astra --activate',
+          'plugin install woocommerce --activate',
           "rewrite structure '/%postname%/'",
-        ];
-        for (const cmd of cmds) {
-          const res = await this.ssh.executeInContainer(
-            this.containerName,
-            `wp ${cmd} --allow-root`,
-            { host },
-          );
-          if (res.exitCode !== 0) {
-            throw new Error(`Command failed: wp ${cmd} - Error: ${res.stderr}`);
-          }
-          presetLogs += `wp ${cmd} -> Success\n`;
-        }
+        ]);
       }
 
       return `WordPress preset '${options.preset}' configured successfully!\n\nExecution log:\n${presetLogs}`;
@@ -487,6 +478,8 @@ export class WpCliService {
       throw err;
     }
   }
+
+  // ── 7. Magic Link & Auth ──────────────────────────────────────────────────
 
   /** Create a magic login link for a specific user */
   async createMagicLink(

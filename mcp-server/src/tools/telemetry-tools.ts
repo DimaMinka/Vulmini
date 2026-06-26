@@ -3,24 +3,38 @@
 // ==========================================
 // Monitoring tools: CPU, RAM, disk, logs,
 // and Docker container status.
+//
+// Sections:
+//   1. System Health
+//   2. Log Fetching (WordPress / Nginx / MCP)
+//   3. Docker & Deployment
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import type { SshExecutor } from "../services/ssh-executor.js";
-import { execSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import type { SshExecutor } from '../services/ssh-executor.js';
+import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { targetSchema } from '../utils/tool-schema.js';
 
-const targetSchema = z
-  .enum(["production", "staging"])
-  .describe("Target server: 'production' or 'staging'");
+/** Wrap any JSON-serialisable value into an MCP tool content array. */
+function jsonContent(data: unknown): { content: [{ type: 'text'; text: string }] } {
+  return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+}
+
+/** Wrap an error into a failed MCP tool response. */
+function errorResponse(message: string): { isError: true; content: [{ type: 'text'; text: string }] } {
+  return { isError: true as const, content: [{ type: 'text' as const, text: message }] };
+}
 
 export function registerTelemetryTools(
   server: McpServer,
   ssh: SshExecutor,
-  getHost: (target: "production" | "staging") => string,
+  getHost: (target: 'production' | 'staging') => string,
 ): void {
+  // ── 1. System Health ──────────────────────────────────────────────────────
+
   // ── get_system_health ──
   server.tool(
     "get_system_health",
@@ -64,25 +78,18 @@ HEALTH_EOF`,
             uptime_human: formatUptime(raw.uptime_seconds),
           };
 
-          return {
-            content: [{ type: "text", text: JSON.stringify(health, null, 2) }],
-          };
+          return jsonContent(health);
         } catch {
           // If parsing fails, return raw output
-          return {
-            content: [{ type: "text", text: result.stdout }],
-          };
+          return jsonContent(result.stdout);
         }
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Failed to get system health: ${error}` },
-          ],
-        };
+        return errorResponse(`Failed to get system health: ${error}`);
       }
     },
   );
+
+  // ── 2. Log Fetching ─────────────────────────────────────────────────────
 
   // ── fetch_error_logs ──
   server.tool(
@@ -106,29 +113,9 @@ HEALTH_EOF`,
           `sh -c "tail -n ${lines} /var/www/html/wp-content/debug.log 2>/dev/null || echo 'No debug.log found (WP_DEBUG may be off)'"`,
           { host },
         );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  target,
-                  lines_requested: lines,
-                  log_content: result.stdout,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent({ target, lines_requested: lines, log_content: result.stdout });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Failed to fetch error logs: ${error}` },
-          ],
-        };
+        return errorResponse(`Failed to fetch error logs: ${error}`);
       }
     },
   );
@@ -164,33 +151,14 @@ HEALTH_EOF`,
           `tail -n ${lines} ${logFile} 2>/dev/null || echo 'Log file not found'`,
           { host },
         );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  target,
-                  log_type,
-                  lines_requested: lines,
-                  log_content: result.stdout,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent({ target, log_type, lines_requested: lines, log_content: result.stdout });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Failed to fetch nginx logs: ${error}` },
-          ],
-        };
+        return errorResponse(`Failed to fetch nginx logs: ${error}`);
       }
     },
   );
+
+  // ── 3. Docker & Deployment ───────────────────────────────────────────────
 
   // ── get_docker_status ──
   server.tool(
@@ -219,25 +187,9 @@ HEALTH_EOF`,
             }
           });
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                { target, containers, total: containers.length },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
+        return jsonContent({ target, containers, total: containers.length });
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Failed to get Docker status: ${error}` },
-          ],
-        };
+        return errorResponse(`Failed to get Docker status: ${error}`);
       }
     },
   );
@@ -347,21 +299,9 @@ HEALTH_EOF`,
           { host, timeoutMs: 300_000 },
         );
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Docker Stack deployed successfully to ${target} (${host})!\n\nOutput:\n${composeResult.stdout}`,
-            },
-          ],
-        };
+        return jsonContent(`Docker Stack deployed successfully to ${target} (${host})!\n\nOutput:\n${composeResult.stdout}`);
       } catch (error) {
-        return {
-          isError: true,
-          content: [
-            { type: "text", text: `Deployment failed on ${target}: ${error}` },
-          ],
-        };
+        return errorResponse(`Deployment failed on ${target}: ${error}`);
       } finally {
         // Clean up local tarball
         if (fs.existsSync(localTarPath)) {
@@ -391,31 +331,10 @@ HEALTH_EOF`,
           `journalctl -u vulmini-mcp -n ${lines} --no-pager`,
           { encoding: "utf-8" },
         );
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                {
-                  lines_requested: lines,
-                  log_content: stdout,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        };
-      } catch (error: any) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: "text",
-              text: `Failed to fetch MCP server logs: ${error.message || error}`,
-            },
-          ],
-        };
+        return jsonContent({ lines_requested: lines, log_content: stdout });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        return errorResponse(`Failed to fetch MCP server logs: ${msg}`);
       }
     },
   );

@@ -16,10 +16,10 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
     const res = await fetch("http://localhost:3000/mcp", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer my-secure-token",
-        "Content-Type": "application/json"
+        Authorization: "Bearer my-secure-token",
+        "Content-Type": "application/json",
       },
-      body: typeof payload === "string" ? payload : JSON.stringify(payload)
+      body: typeof payload === "string" ? payload : JSON.stringify(payload),
     });
     return res;
   }
@@ -29,10 +29,10 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
       jsonrpc: "2.0",
       method: "tools/list",
       params: {},
-      id: 10
+      id: 10,
     });
     assert.strictEqual(res.status, 200);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.strictEqual(data.jsonrpc, "2.0");
     assert.strictEqual(data.id, 10);
     assert.ok(data.result);
@@ -46,7 +46,7 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
   it("should reject invalid JSON payload with Parse Error (-32700)", async () => {
     const res = await sendRpc("{ invalid json }");
     assert.strictEqual(res.status, 400);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.strictEqual(data.jsonrpc, "2.0");
     assert.strictEqual(data.id, null);
     assert.ok(data.error);
@@ -58,10 +58,10 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
     const res = await sendRpc({
       method: "tools/list",
       params: {},
-      id: 11
+      id: 11,
     });
     assert.strictEqual(res.status, 400);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.ok(data.error);
     assert.strictEqual(data.error.code, -32600);
   });
@@ -71,10 +71,10 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
       jsonrpc: "2.0",
       method: "invalid_method",
       params: {},
-      id: 12
+      id: 12,
     });
     assert.strictEqual(res.status, 404);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.ok(data.error);
     assert.strictEqual(data.error.code, -32601);
   });
@@ -84,10 +84,10 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
       jsonrpc: "2.0",
       method: "tools/call",
       params: { name: "non_existent_tool", arguments: {} },
-      id: 13
+      id: 13,
     });
     assert.strictEqual(res.status, 404);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.ok(data.error);
     assert.strictEqual(data.error.code, -32601);
   });
@@ -97,10 +97,10 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
       jsonrpc: "2.0",
       method: "tools/call",
       params: { name: "wp_plugin_status", arguments: {} },
-      id: 14
+      id: 14,
     });
     assert.strictEqual(res.status, 400);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.ok(data.error);
     assert.strictEqual(data.error.code, -32602);
     assert.match(data.error.message, /Invalid params/);
@@ -110,11 +110,14 @@ describe("MCP JSON-RPC Protocol Compliance", () => {
     const res = await sendRpc({
       jsonrpc: "2.0",
       method: "tools/call",
-      params: { name: "get_instance_status", arguments: { instance_id: "not-a-uuid" } },
-      id: 15
+      params: {
+        name: "get_instance_status",
+        arguments: { instance_id: "not-a-uuid" },
+      },
+      id: 15,
     });
     assert.strictEqual(res.status, 400);
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.ok(data.error);
     assert.strictEqual(data.error.code, -32602);
   });

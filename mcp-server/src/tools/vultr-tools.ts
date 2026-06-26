@@ -393,7 +393,8 @@ export function registerVultrTools(
 
         // 2. Create Instance
         const plan = getEnvVal("VULTR_PROD_PLAN") || defaultConfig.plan;
-        const region = getEnvVal("VULTR_PROD_REGION") || defaultConfig.region || "tlv";
+        const region =
+          getEnvVal("VULTR_PROD_REGION") || defaultConfig.region || "tlv";
 
         const instance = await vultr.createInstance({
           region: region,

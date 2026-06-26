@@ -91,12 +91,10 @@ export class WpCliService {
       }
       return stagingHost;
     }
-    
+
     const prodHost = process.env.SSH_HOST;
     if (!prodHost) {
-      throw new Error(
-        "Production host not configured under SSH_HOST in .env",
-      );
+      throw new Error("Production host not configured under SSH_HOST in .env");
     }
     return prodHost;
   }
@@ -339,7 +337,9 @@ export class WpCliService {
       }
 
       // 4. Configure specific preset
-      console.log(`[Vulmini] Running preset configuration: ${options.preset}...`);
+      console.log(
+        `[Vulmini] Running preset configuration: ${options.preset}...`,
+      );
       let presetLogs = "";
 
       if (options.preset === "landing") {

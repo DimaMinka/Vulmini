@@ -57,13 +57,35 @@ let backups: Backup[] = [];
 let stagingHost: string | null = null;
 let plugins: Record<"production" | "staging", Plugin[]> = {
   production: [
-    { name: "sfwd-lms", status: "active", update: "available", version: "4.10.0", update_version: "4.11.0" },
-    { name: "classic-editor", status: "active", update: "none", version: "1.6.3" }
+    {
+      name: "sfwd-lms",
+      status: "active",
+      update: "available",
+      version: "4.10.0",
+      update_version: "4.11.0",
+    },
+    {
+      name: "classic-editor",
+      status: "active",
+      update: "none",
+      version: "1.6.3",
+    },
   ],
   staging: [
-    { name: "sfwd-lms", status: "active", update: "available", version: "4.10.0", update_version: "4.11.0" },
-    { name: "classic-editor", status: "active", update: "none", version: "1.6.3" }
-  ]
+    {
+      name: "sfwd-lms",
+      status: "active",
+      update: "available",
+      version: "4.10.0",
+      update_version: "4.11.0",
+    },
+    {
+      name: "classic-editor",
+      status: "active",
+      update: "none",
+      version: "1.6.3",
+    },
+  ],
 };
 
 export function resetState() {
@@ -73,13 +95,35 @@ export function resetState() {
   stagingHost = null;
   plugins = {
     production: [
-      { name: "sfwd-lms", status: "active", update: "available", version: "4.10.0", update_version: "4.11.0" },
-      { name: "classic-editor", status: "active", update: "none", version: "1.6.3" }
+      {
+        name: "sfwd-lms",
+        status: "active",
+        update: "available",
+        version: "4.10.0",
+        update_version: "4.11.0",
+      },
+      {
+        name: "classic-editor",
+        status: "active",
+        update: "none",
+        version: "1.6.3",
+      },
     ],
     staging: [
-      { name: "sfwd-lms", status: "active", update: "available", version: "4.10.0", update_version: "4.11.0" },
-      { name: "classic-editor", status: "active", update: "none", version: "1.6.3" }
-    ]
+      {
+        name: "sfwd-lms",
+        status: "active",
+        update: "available",
+        version: "4.10.0",
+        update_version: "4.11.0",
+      },
+      {
+        name: "classic-editor",
+        status: "active",
+        update: "none",
+        version: "1.6.3",
+      },
+    ],
   };
 }
 
@@ -91,68 +135,68 @@ const ipSchema = z.string().ip();
 const toolSchemas: Record<string, z.ZodTypeAny> = {
   list_instances: z.object({}),
   get_instance_status: z.object({
-    instance_id: uuidSchema
+    instance_id: uuidSchema,
   }),
   create_snapshot: z.object({
     instance_id: uuidSchema,
-    description: z.string().default("Vulmini auto-snapshot")
+    description: z.string().default("Vulmini auto-snapshot"),
   }),
   get_snapshot_status: z.object({
-    snapshot_id: z.string()
+    snapshot_id: z.string(),
   }),
   create_ephemeral_staging: z.object({
     snapshot_id: z.string(),
-    label: z.string().default("vulmini-staging-ephemeral")
+    label: z.string().default("vulmini-staging-ephemeral"),
   }),
   destroy_ephemeral_staging: z.object({
-    instance_id: uuidSchema
+    instance_id: uuidSchema,
   }),
   list_snapshots: z.object({}),
   create_production_vps: z.object({}),
   create_clean_staging: z.object({}),
   wp_plugin_status: z.object({
-    target: targetSchema
+    target: targetSchema,
   }),
   wp_run_update: z.object({
     target: targetSchema,
-    plugin_slug: z.string().optional()
+    plugin_slug: z.string().optional(),
   }),
   wp_db_migrate: z.object({
-    target: targetSchema
+    target: targetSchema,
   }),
   wp_health_check: z.object({
-    target: targetSchema
+    target: targetSchema,
   }),
   wp_run_backup: z.object({
     target: targetSchema,
     scope: z.enum(["full", "db", "plugin"]).default("full"),
-    plugin_slug: z.string().optional()
+    plugin_slug: z.string().optional(),
   }),
   wp_run_restore: z.object({
     target: targetSchema,
     backup_id: z.string(),
-    scope: z.enum(["full", "db", "plugins"]).default("full")
+    scope: z.enum(["full", "db", "plugins"]).default("full"),
   }),
   set_staging_host: z.object({
-    host: ipSchema
+    host: ipSchema,
   }),
   get_system_health: z.object({
-    target: targetSchema
+    target: targetSchema,
   }),
   fetch_error_logs: z.object({
     target: targetSchema,
-    lines: z.number().int().min(10).max(500).default(100)
+    lines: z.number().int().min(10).max(500).default(100),
   }),
   fetch_nginx_logs: z.object({
     target: targetSchema,
     log_type: z.enum(["access", "error"]).default("error"),
-    lines: z.number().int().min(10).max(500).default(50)
+    lines: z.number().int().min(10).max(500).default(50),
   }),
   get_docker_status: z.object({
-    target: targetSchema
+    target: targetSchema,
   }),
   deploy_stack: z.object({
-    target: targetSchema
+    target: targetSchema,
   }),
   wp_configure_preset: z.object({
     target: targetSchema,
@@ -160,8 +204,8 @@ const toolSchemas: Record<string, z.ZodTypeAny> = {
     title: z.string().optional(),
     admin_user: z.string().optional(),
     admin_password: z.string().optional(),
-    admin_email: z.string().optional()
-  })
+    admin_email: z.string().optional(),
+  }),
 };
 
 // SSE clients list
@@ -192,8 +236,8 @@ export function createServer() {
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-      "X-Accel-Buffering": "no"
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     });
 
     // Write handshake event
@@ -203,7 +247,7 @@ export function createServer() {
     sseClients.push(client);
 
     req.on("close", () => {
-      sseClients = sseClients.filter(c => c !== client);
+      sseClients = sseClients.filter((c) => c !== client);
     });
   });
 
@@ -216,14 +260,14 @@ export function createServer() {
       res.status(400).json({
         jsonrpc: "2.0",
         error: { code: -32600, message: "Invalid Request" },
-        id: id || null
+        id: id || null,
       });
       return;
     }
 
     if (method === "tools/list") {
       // Return tools list with schemas
-      const toolsList = Object.keys(toolSchemas).map(name => {
+      const toolsList = Object.keys(toolSchemas).map((name) => {
         let description = "";
         let inputProperties: Record<string, any> = {};
         let required: string[] = [];
@@ -231,124 +275,250 @@ export function createServer() {
         // Descriptions & structures matching the actual code
         switch (name) {
           case "list_instances":
-            description = "List all Vultr VPS instances with their status, IP, and region";
+            description =
+              "List all Vultr VPS instances with their status, IP, and region";
             break;
           case "get_instance_status":
-            description = "Get detailed status of a specific Vultr VPS instance";
-            inputProperties = { instance_id: { type: "string", description: "Vultr instance UUID" } };
+            description =
+              "Get detailed status of a specific Vultr VPS instance";
+            inputProperties = {
+              instance_id: {
+                type: "string",
+                description: "Vultr instance UUID",
+              },
+            };
             required = ["instance_id"];
             break;
           case "create_snapshot":
             description = "Create a snapshot of a Vultr VPS instance.";
             inputProperties = {
-              instance_id: { type: "string", description: "Instance UUID to snapshot" },
-              description: { type: "string", default: "Vulmini auto-snapshot", description: "Human-readable description" }
+              instance_id: {
+                type: "string",
+                description: "Instance UUID to snapshot",
+              },
+              description: {
+                type: "string",
+                default: "Vulmini auto-snapshot",
+                description: "Human-readable description",
+              },
             };
             required = ["instance_id"];
             break;
           case "get_snapshot_status":
-            description = "Check the status of a Vultr snapshot (pending/complete)";
-            inputProperties = { snapshot_id: { type: "string", description: "Snapshot UUID" } };
+            description =
+              "Check the status of a Vultr snapshot (pending/complete)";
+            inputProperties = {
+              snapshot_id: { type: "string", description: "Snapshot UUID" },
+            };
             required = ["snapshot_id"];
             break;
           case "create_ephemeral_staging":
-            description = "Create a temporary staging VPS from a production snapshot.";
+            description =
+              "Create a temporary staging VPS from a production snapshot.";
             inputProperties = {
-              snapshot_id: { type: "string", description: "Snapshot ID to deploy from" },
-              label: { type: "string", default: "vulmini-staging-ephemeral", description: "Label for the staging instance" }
+              snapshot_id: {
+                type: "string",
+                description: "Snapshot ID to deploy from",
+              },
+              label: {
+                type: "string",
+                default: "vulmini-staging-ephemeral",
+                description: "Label for the staging instance",
+              },
             };
             required = ["snapshot_id"];
             break;
           case "destroy_ephemeral_staging":
-            description = "Permanently destroy an ephemeral staging VPS after testing is complete.";
-            inputProperties = { instance_id: { type: "string", description: "UUID of the staging instance to destroy" } };
+            description =
+              "Permanently destroy an ephemeral staging VPS after testing is complete.";
+            inputProperties = {
+              instance_id: {
+                type: "string",
+                description: "UUID of the staging instance to destroy",
+              },
+            };
             required = ["instance_id"];
             break;
           case "list_snapshots":
             description = "List all Vultr snapshots with their status and size";
             break;
           case "create_production_vps":
-            description = "Deploy a new production VPS on Vultr, set up SSH key, wait for activation, and update project .env file with the IP";
+            description =
+              "Deploy a new production VPS on Vultr, set up SSH key, wait for activation, and update project .env file with the IP";
             break;
           case "create_clean_staging":
-            description = "Deploy a new clean staging VPS from scratch on Vultr (not from a snapshot), set up SSH key, wait for activation, and return the IP";
+            description =
+              "Deploy a new clean staging VPS from scratch on Vultr (not from a snapshot), set up SSH key, wait for activation, and return the IP";
             break;
           case "wp_plugin_status":
-            description = "Get a JSON list of all WordPress plugins with their status, current version, and available updates.";
-            inputProperties = { target: { type: "string", enum: ["production", "staging"], description: "Target server" } };
+            description =
+              "Get a JSON list of all WordPress plugins with their status, current version, and available updates.";
+            inputProperties = {
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+            };
             required = ["target"];
             break;
           case "wp_run_update":
             description = "Update a specific WordPress plugin or all plugins.";
             inputProperties = {
-              target: { type: "string", enum: ["production", "staging"], description: "Target server" },
-              plugin_slug: { type: "string", description: "Specific plugin slug to update" }
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+              plugin_slug: {
+                type: "string",
+                description: "Specific plugin slug to update",
+              },
             };
             required = ["target"];
             break;
           case "wp_db_migrate":
-            description = "Run WordPress core database migration and LearnDash data upgrades.";
-            inputProperties = { target: { type: "string", enum: ["production", "staging"], description: "Target server" } };
+            description =
+              "Run WordPress core database migration and LearnDash data upgrades.";
+            inputProperties = {
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+            };
             required = ["target"];
             break;
           case "wp_health_check":
             description = "Perform a health check on the WordPress site.";
-            inputProperties = { target: { type: "string", enum: ["production", "staging"], description: "Target server" } };
+            inputProperties = {
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+            };
             required = ["target"];
             break;
           case "wp_run_backup":
-            description = "Create a backup of the database and/or plugins BEFORE making any changes on production.";
+            description =
+              "Create a backup of the database and/or plugins BEFORE making any changes on production.";
             inputProperties = {
-              target: { type: "string", enum: ["production", "staging"], description: "Target server" },
-              scope: { type: "string", enum: ["full", "db", "plugin"], default: "full" },
-              plugin_slug: { type: "string", description: "Plugin slug when scope is 'plugin'" }
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+              scope: {
+                type: "string",
+                enum: ["full", "db", "plugin"],
+                default: "full",
+              },
+              plugin_slug: {
+                type: "string",
+                description: "Plugin slug when scope is 'plugin'",
+              },
             };
             required = ["target"];
             break;
           case "wp_run_restore":
-            description = "EMERGENCY ROLLBACK: Restore the database and/or plugins from a previous backup.";
+            description =
+              "EMERGENCY ROLLBACK: Restore the database and/or plugins from a previous backup.";
             inputProperties = {
-              target: { type: "string", enum: ["production", "staging"], description: "Target server" },
-              backup_id: { type: "string", description: "The backup_id from wp_run_backup" },
-              scope: { type: "string", enum: ["full", "db", "plugins"], default: "full" }
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+              backup_id: {
+                type: "string",
+                description: "The backup_id from wp_run_backup",
+              },
+              scope: {
+                type: "string",
+                enum: ["full", "db", "plugins"],
+                default: "full",
+              },
             };
             required = ["target", "backup_id"];
             break;
           case "set_staging_host":
             description = "Set the SSH host for the staging server.";
-            inputProperties = { host: { type: "string", description: "IP address of the staging VPS" } };
+            inputProperties = {
+              host: {
+                type: "string",
+                description: "IP address of the staging VPS",
+              },
+            };
             required = ["host"];
             break;
           case "get_system_health":
             description = "Get system health metrics.";
-            inputProperties = { target: { type: "string", enum: ["production", "staging"], description: "Target server" } };
+            inputProperties = {
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+            };
             required = ["target"];
             break;
           case "fetch_error_logs":
             description = "Fetch the tail of WordPress error logs.";
             inputProperties = {
-              target: { type: "string", enum: ["production", "staging"], description: "Target server" },
-              lines: { type: "number", minimum: 10, maximum: 500, default: 100 }
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+              lines: {
+                type: "number",
+                minimum: 10,
+                maximum: 500,
+                default: 100,
+              },
             };
             required = ["target"];
             break;
           case "fetch_nginx_logs":
             description = "Fetch the tail of Nginx access or error logs.";
             inputProperties = {
-              target: { type: "string", enum: ["production", "staging"], description: "Target server" },
-              log_type: { type: "string", enum: ["access", "error"], default: "error" },
-              lines: { type: "number", minimum: 10, maximum: 500, default: 50 }
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+              log_type: {
+                type: "string",
+                enum: ["access", "error"],
+                default: "error",
+              },
+              lines: { type: "number", minimum: 10, maximum: 500, default: 50 },
             };
             required = ["target"];
             break;
           case "get_docker_status":
-            description = "Get the status of all Docker containers in the Vulmini stack.";
-            inputProperties = { target: { type: "string", enum: ["production", "staging"], description: "Target server" } };
+            description =
+              "Get the status of all Docker containers in the Vulmini stack.";
+            inputProperties = {
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+            };
             required = ["target"];
             break;
           case "deploy_stack":
-            description = "Deploy/Redeploy the Docker stack to the target server.";
-            inputProperties = { target: { type: "string", enum: ["production", "staging"], description: "Target server" } };
+            description =
+              "Deploy/Redeploy the Docker stack to the target server.";
+            inputProperties = {
+              target: {
+                type: "string",
+                enum: ["production", "staging"],
+                description: "Target server",
+              },
+            };
             required = ["target"];
             break;
         }
@@ -359,15 +529,15 @@ export function createServer() {
           inputSchema: {
             type: "object",
             properties: inputProperties,
-            required
-          }
+            required,
+          },
         };
       });
 
       res.json({
         jsonrpc: "2.0",
         result: { tools: toolsList },
-        id
+        id,
       });
       return;
     }
@@ -376,7 +546,7 @@ export function createServer() {
       res.status(404).json({
         jsonrpc: "2.0",
         error: { code: -32601, message: "Method not found" },
-        id
+        id,
       });
       return;
     }
@@ -386,7 +556,7 @@ export function createServer() {
       res.status(404).json({
         jsonrpc: "2.0",
         error: { code: -32601, message: `Tool not found: ${toolName}` },
-        id
+        id,
       });
       return;
     }
@@ -400,9 +570,9 @@ export function createServer() {
         error: {
           code: -32602,
           message: "Invalid params",
-          data: validationResult.error.format()
+          data: validationResult.error.format(),
         },
-        id
+        id,
       });
       return;
     }
@@ -416,7 +586,7 @@ export function createServer() {
     switch (toolName) {
       case "list_instances": {
         resultText = JSON.stringify(
-          instances.map(i => ({
+          instances.map((i) => ({
             id: i.id,
             label: i.label,
             ip: i.main_ip,
@@ -424,16 +594,16 @@ export function createServer() {
             plan: i.plan,
             status: i.status,
             power: i.power_status,
-            tags: i.tags
+            tags: i.tags,
           })),
           null,
-          2
+          2,
         );
         break;
       }
 
       case "get_instance_status": {
-        const inst = instances.find(i => i.id === validatedArgs.instance_id);
+        const inst = instances.find((i) => i.id === validatedArgs.instance_id);
         if (!inst) {
           isError = true;
           resultText = `Failed to get instance: Instance not found: ${validatedArgs.instance_id}`;
@@ -444,7 +614,7 @@ export function createServer() {
       }
 
       case "create_snapshot": {
-        const inst = instances.find(i => i.id === validatedArgs.instance_id);
+        const inst = instances.find((i) => i.id === validatedArgs.instance_id);
         if (!inst) {
           isError = true;
           resultText = `Failed to create snapshot: Instance not found: ${validatedArgs.instance_id}`;
@@ -454,7 +624,7 @@ export function createServer() {
             description: validatedArgs.description,
             status: "pending",
             size: 16106127360, // 15 GB
-            date_created: new Date().toISOString()
+            date_created: new Date().toISOString(),
           };
           snapshots.push(snapshot);
 
@@ -468,17 +638,18 @@ export function createServer() {
               snapshot_id: snapshot.id,
               status: snapshot.status,
               description: snapshot.description,
-              message: "Snapshot creation started. Use get_snapshot_status to monitor progress. It may take 5-30 minutes."
+              message:
+                "Snapshot creation started. Use get_snapshot_status to monitor progress. It may take 5-30 minutes.",
             },
             null,
-            2
+            2,
           );
         }
         break;
       }
 
       case "get_snapshot_status": {
-        const snap = snapshots.find(s => s.id === validatedArgs.snapshot_id);
+        const snap = snapshots.find((s) => s.id === validatedArgs.snapshot_id);
         if (!snap) {
           isError = true;
           resultText = `Failed to get snapshot: Snapshot not found: ${validatedArgs.snapshot_id}`;
@@ -488,17 +659,17 @@ export function createServer() {
               id: snap.id,
               status: snap.status,
               description: snap.description,
-              size_gb: (snap.size / 1_073_741_824).toFixed(2)
+              size_gb: (snap.size / 1_073_741_824).toFixed(2),
             },
             null,
-            2
+            2,
           );
         }
         break;
       }
 
       case "create_ephemeral_staging": {
-        const snap = snapshots.find(s => s.id === validatedArgs.snapshot_id);
+        const snap = snapshots.find((s) => s.id === validatedArgs.snapshot_id);
         if (!snap) {
           isError = true;
           resultText = `Failed to create staging: Snapshot not found: ${validatedArgs.snapshot_id}`;
@@ -514,7 +685,7 @@ export function createServer() {
             plan: "vhf-2c-4gb",
             status: "pending",
             power_status: "running",
-            tags: ["vulmini", "staging", "ephemeral"]
+            tags: ["vulmini", "staging", "ephemeral"],
           };
           instances.push(inst);
 
@@ -531,23 +702,29 @@ export function createServer() {
               label: inst.label,
               region: inst.region,
               plan: inst.plan,
-              message: "Staging VPS created. It will take 1-5 minutes to become active. Use get_instance_status to check. Once active, you can run WP-CLI commands on it."
+              message:
+                "Staging VPS created. It will take 1-5 minutes to become active. Use get_instance_status to check. Once active, you can run WP-CLI commands on it.",
             },
             null,
-            2
+            2,
           );
         }
         break;
       }
 
       case "destroy_ephemeral_staging": {
-        const instIdx = instances.findIndex(i => i.id === validatedArgs.instance_id);
+        const instIdx = instances.findIndex(
+          (i) => i.id === validatedArgs.instance_id,
+        );
         if (instIdx === -1) {
           isError = true;
           resultText = `Failed to destroy staging: Instance not found: ${validatedArgs.instance_id}`;
         } else {
           const inst = instances[instIdx];
-          if (!inst.tags.includes("ephemeral") && !inst.tags.includes("staging")) {
+          if (
+            !inst.tags.includes("ephemeral") &&
+            !inst.tags.includes("staging")
+          ) {
             isError = true;
             resultText = `SAFETY CHECK FAILED: Instance ${inst.id} (${inst.label}) is NOT tagged as 'ephemeral' or 'staging'. Refusing to destroy. Tags: [${inst.tags.join(", ")}]`;
           } else {
@@ -556,10 +733,10 @@ export function createServer() {
               {
                 destroyed: inst.id,
                 label: inst.label,
-                message: "Staging VPS destroyed successfully. Resources freed."
+                message: "Staging VPS destroyed successfully. Resources freed.",
               },
               null,
-              2
+              2,
             );
           }
         }
@@ -568,15 +745,15 @@ export function createServer() {
 
       case "list_snapshots": {
         resultText = JSON.stringify(
-          snapshots.map(s => ({
+          snapshots.map((s) => ({
             id: s.id,
             description: s.description,
             status: s.status,
             size_gb: (s.size / 1_073_741_824).toFixed(2),
-            created: s.date_created
+            created: s.date_created,
           })),
           null,
-          2
+          2,
         );
         break;
       }
@@ -590,7 +767,7 @@ export function createServer() {
           plan: "vhf-2c-4gb",
           status: "pending",
           power_status: "running",
-          tags: ["vulmini", "production"]
+          tags: ["vulmini", "production"],
         };
         instances.push(inst);
 
@@ -604,10 +781,10 @@ export function createServer() {
             instance_id: inst.id,
             ip: inst.main_ip,
             status: inst.status,
-            message: `Production VPS deployed successfully! Configuration in .env updated with SSH_HOST=${inst.main_ip} and VULTR_PROD_INSTANCE_ID=${inst.id}.`
+            message: `Production VPS deployed successfully! Configuration in .env updated with SSH_HOST=${inst.main_ip} and VULTR_PROD_INSTANCE_ID=${inst.id}.`,
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -621,7 +798,7 @@ export function createServer() {
           plan: "vhf-2c-4gb",
           status: "pending",
           power_status: "running",
-          tags: ["vulmini", "staging"]
+          tags: ["vulmini", "staging"],
         };
         instances.push(inst);
 
@@ -635,10 +812,10 @@ export function createServer() {
             instance_id: inst.id,
             ip: inst.main_ip,
             status: inst.status,
-            message: `Staging VPS deployed successfully! IP is ${inst.main_ip}. The VPS is currently clean. Remember to run set_staging_host with this IP, and then run the deploy_stack tool to install Docker and start the containers.`
+            message: `Staging VPS deployed successfully! IP is ${inst.main_ip}. The VPS is currently clean. Remember to run set_staging_host with this IP, and then run the deploy_stack tool to install Docker and start the containers.`,
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -646,16 +823,18 @@ export function createServer() {
       case "wp_plugin_status": {
         const target: "production" | "staging" = validatedArgs.target;
         const targetPlugins = plugins[target];
-        const updatesAvailable = targetPlugins.filter(p => p.update === "available");
+        const updatesAvailable = targetPlugins.filter(
+          (p) => p.update === "available",
+        );
         resultText = JSON.stringify(
           {
             total_plugins: targetPlugins.length,
             updates_available: updatesAvailable.length,
             plugins_with_updates: updatesAvailable,
-            all_plugins: targetPlugins
+            all_plugins: targetPlugins,
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -666,7 +845,7 @@ export function createServer() {
         const targetPlugins = plugins[target];
 
         let count = 0;
-        targetPlugins.forEach(p => {
+        targetPlugins.forEach((p) => {
           if (!slug || p.name === slug) {
             if (p.update === "available") {
               p.update = "none";
@@ -684,10 +863,11 @@ export function createServer() {
             target,
             plugin: slug || "ALL",
             output: `Success: Updated ${count} of ${slug ? 1 : count} plugins.`,
-            message: "Update completed. Run wp_health_check to verify the site is healthy."
+            message:
+              "Update completed. Run wp_health_check to verify the site is healthy.",
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -696,11 +876,13 @@ export function createServer() {
         resultText = JSON.stringify(
           {
             target: validatedArgs.target,
-            output: "Success: Database migrated and LearnDash upgrades completed.",
-            message: "Database migration complete. Run wp_health_check to verify."
+            output:
+              "Success: Database migrated and LearnDash upgrades completed.",
+            message:
+              "Database migration complete. Run wp_health_check to verify.",
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -711,10 +893,10 @@ export function createServer() {
             is_healthy: true,
             http_status: 200,
             fatal_errors_found: false,
-            message: "WordPress site is healthy."
+            message: "WordPress site is healthy.",
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -726,7 +908,7 @@ export function createServer() {
           target: validatedArgs.target,
           scope: validatedArgs.scope,
           plugin_slug: validatedArgs.plugin_slug,
-          date_created: new Date().toISOString()
+          date_created: new Date().toISOString(),
         });
 
         resultText = JSON.stringify(
@@ -734,16 +916,21 @@ export function createServer() {
             target: validatedArgs.target,
             scope: validatedArgs.scope,
             output: `Success: Backup created at /var/www/html/backups/backup_${backupId}.tar.gz`,
-            message: "Backup created. Save the backup_id for potential rollback with wp_run_restore."
+            message:
+              "Backup created. Save the backup_id for potential rollback with wp_run_restore.",
           },
           null,
-          2
+          2,
         );
         break;
       }
 
       case "wp_run_restore": {
-        const backupExists = backups.some(b => b.id === validatedArgs.backup_id && b.target === validatedArgs.target);
+        const backupExists = backups.some(
+          (b) =>
+            b.id === validatedArgs.backup_id &&
+            b.target === validatedArgs.target,
+        );
         if (!backupExists) {
           isError = true;
           resultText = `Restore failed on ${validatedArgs.target}: Backup not found: ${validatedArgs.backup_id}`;
@@ -754,10 +941,11 @@ export function createServer() {
               backup_id: validatedArgs.backup_id,
               scope: validatedArgs.scope,
               output: "Success: Restore from backup completed.",
-              message: "Restore completed. Run wp_health_check to verify the site is healthy again."
+              message:
+                "Restore completed. Run wp_health_check to verify the site is healthy again.",
             },
             null,
-            2
+            2,
           );
         }
         break;
@@ -781,10 +969,10 @@ export function createServer() {
             disk_total_gb: 80,
             disk_usage_percent: 18.8,
             uptime_seconds: 3600,
-            uptime_human: "1h"
+            uptime_human: "1h",
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -794,10 +982,10 @@ export function createServer() {
           {
             target: validatedArgs.target,
             lines_requested: validatedArgs.lines,
-            log_content: `[21-Jun-2026 18:13:00 UTC] PHP Notice: Simulated debug.log tail on ${validatedArgs.target}.`
+            log_content: `[21-Jun-2026 18:13:00 UTC] PHP Notice: Simulated debug.log tail on ${validatedArgs.target}.`,
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -808,10 +996,10 @@ export function createServer() {
             target: validatedArgs.target,
             log_type: validatedArgs.log_type,
             lines_requested: validatedArgs.lines,
-            log_content: `Simulated Nginx ${validatedArgs.log_type} log tail on ${validatedArgs.target}.`
+            log_content: `Simulated Nginx ${validatedArgs.log_type} log tail on ${validatedArgs.target}.`,
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -821,16 +1009,41 @@ export function createServer() {
           {
             target: validatedArgs.target,
             containers: [
-              { name: "vulmini_db", state: "running", status: "Up 2 hours (healthy)", health: "db" },
-              { name: "vulmini_cache", state: "running", status: "Up 2 hours (healthy)", health: "cache" },
-              { name: "vulmini_app", state: "running", status: "Up 2 hours (healthy)", health: "app" },
-              { name: "vulmini_web", state: "running", status: "Up 2 hours (healthy)", health: "web" },
-              { name: "vulmini_cron", state: "running", status: "Up 2 hours (healthy)", health: "cron" }
+              {
+                name: "vulmini_db",
+                state: "running",
+                status: "Up 2 hours (healthy)",
+                health: "db",
+              },
+              {
+                name: "vulmini_cache",
+                state: "running",
+                status: "Up 2 hours (healthy)",
+                health: "cache",
+              },
+              {
+                name: "vulmini_app",
+                state: "running",
+                status: "Up 2 hours (healthy)",
+                health: "app",
+              },
+              {
+                name: "vulmini_web",
+                state: "running",
+                status: "Up 2 hours (healthy)",
+                health: "web",
+              },
+              {
+                name: "vulmini_cron",
+                state: "running",
+                status: "Up 2 hours (healthy)",
+                health: "cron",
+              },
             ],
-            total: 5
+            total: 5,
           },
           null,
-          2
+          2,
         );
         break;
       }
@@ -848,9 +1061,11 @@ export function createServer() {
 
     res.json({
       jsonrpc: "2.0",
-      result: isError ? undefined : { content: [{ type: "text", text: resultText }] },
+      result: isError
+        ? undefined
+        : { content: [{ type: "text", text: resultText }] },
       error: isError ? { code: -32000, message: resultText } : undefined,
-      id
+      id,
     });
   });
 
@@ -860,7 +1075,7 @@ export function createServer() {
       res.status(400).json({
         jsonrpc: "2.0",
         error: { code: -32700, message: "Parse error" },
-        id: null
+        id: null,
       });
       return;
     }
@@ -888,7 +1103,9 @@ let keepAliveInterval: NodeJS.Timeout | null = null;
 
 export function startServer(port = 3000) {
   if (process.env.MOCK_SERVER_EXTERNAL === "true") {
-    console.log(`[Mock Server] Bypassing startServer because MOCK_SERVER_EXTERNAL is true`);
+    console.log(
+      `[Mock Server] Bypassing startServer because MOCK_SERVER_EXTERNAL is true`,
+    );
     return null;
   }
   const app = createServer();
@@ -898,7 +1115,7 @@ export function startServer(port = 3000) {
 
   // Set up SSE keep-alive stream comments to simulate active keep-alive
   keepAliveInterval = setInterval(() => {
-    sseClients.forEach(client => {
+    sseClients.forEach((client) => {
       try {
         client.res.write(": keep-alive\n\n");
       } catch (err) {
@@ -922,7 +1139,7 @@ export function stopServer() {
     serverInstance.close();
     serverInstance = null;
   }
-  sseClients.forEach(c => {
+  sseClients.forEach((c) => {
     try {
       c.res.end();
     } catch {

@@ -41,7 +41,7 @@ jobs:
         with:
           # Upload only index.html to keep the deployment package minimal and secure
           # Or upload '.' but only containing static files. We will upload '.' to include images/docs if needed.
-          path: '.'
+          path: "."
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

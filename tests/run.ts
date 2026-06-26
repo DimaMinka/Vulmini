@@ -18,7 +18,7 @@ async function main() {
     "tests/gateway-routing.test.ts",
     "tests/protocol-compliance.test.ts",
     "tests/docker-ssh-integration.test.ts",
-    "tests/workflow.test.ts"
+    "tests/workflow.test.ts",
   ];
 
   // Spawn the Node.js native test runner using tsx from project root
@@ -29,8 +29,8 @@ async function main() {
       ...process.env,
       NODE_ENV: "test",
       NODE_PATH: path.resolve(projectRoot, "mcp-server/node_modules"),
-      MOCK_SERVER_EXTERNAL: "true"
-    }
+      MOCK_SERVER_EXTERNAL: "true",
+    },
   });
 
   testProcess.on("close", (code) => {

@@ -16,17 +16,17 @@ describe("Docker and SSH Integration", () => {
     const res = await fetch("http://localhost:3000/mcp", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer my-secure-token",
-        "Content-Type": "application/json"
+        Authorization: "Bearer my-secure-token",
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
         method: "tools/call",
         params: { name, arguments: args },
-        id: 1
-      })
+        id: 1,
+      }),
     });
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     if (data.error) {
       throw new Error(data.error.message);
     }
@@ -34,7 +34,9 @@ describe("Docker and SSH Integration", () => {
   }
 
   it("should get Docker status containing 5 healthy containers", async () => {
-    const result = await callTool("get_docker_status", { target: "production" });
+    const result = await callTool("get_docker_status", {
+      target: "production",
+    });
     assert.strictEqual(result.target, "production");
     assert.strictEqual(result.total, 5);
     assert.ok(Array.isArray(result.containers));
@@ -50,23 +52,28 @@ describe("Docker and SSH Integration", () => {
     const res = await fetch("http://localhost:3000/mcp", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer my-secure-token",
-        "Content-Type": "application/json"
+        Authorization: "Bearer my-secure-token",
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
         method: "tools/call",
         params: { name: "deploy_stack", arguments: { target: "production" } },
-        id: 1
-      })
+        id: 1,
+      }),
     });
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.ok(data.result);
-    assert.match(data.result.content[0].text, /Docker Stack deployed successfully/);
+    assert.match(
+      data.result.content[0].text,
+      /Docker Stack deployed successfully/,
+    );
   });
 
   it("should retrieve system health metrics", async () => {
-    const health = await callTool("get_system_health", { target: "production" });
+    const health = await callTool("get_system_health", {
+      target: "production",
+    });
     assert.strictEqual(health.cpu_cores, 2);
     assert.ok(Array.isArray(health.load_average));
     assert.strictEqual(health.load_average.length, 3);
@@ -76,14 +83,21 @@ describe("Docker and SSH Integration", () => {
   });
 
   it("should fetch WordPress error logs", async () => {
-    const result = await callTool("fetch_error_logs", { target: "production", lines: 100 });
+    const result = await callTool("fetch_error_logs", {
+      target: "production",
+      lines: 100,
+    });
     assert.strictEqual(result.target, "production");
     assert.strictEqual(result.lines_requested, 100);
     assert.match(result.log_content, /debug.log/);
   });
 
   it("should fetch Nginx logs", async () => {
-    const result = await callTool("fetch_nginx_logs", { target: "production", log_type: "error", lines: 50 });
+    const result = await callTool("fetch_nginx_logs", {
+      target: "production",
+      log_type: "error",
+      lines: 50,
+    });
     assert.strictEqual(result.target, "production");
     assert.strictEqual(result.log_type, "error");
     assert.strictEqual(result.lines_requested, 50);
@@ -94,8 +108,8 @@ describe("Docker and SSH Integration", () => {
     const res = await fetch("http://localhost:3000/mcp", {
       method: "POST",
       headers: {
-        "Authorization": "Bearer my-secure-token",
-        "Content-Type": "application/json"
+        Authorization: "Bearer my-secure-token",
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -107,14 +121,17 @@ describe("Docker and SSH Integration", () => {
             preset: "landing",
             title: "Test Site",
             admin_user: "dev",
-            admin_password: "SecurePassword123!"
-          }
+            admin_password: "SecurePassword123!",
+          },
         },
-        id: 1
-      })
+        id: 1,
+      }),
     });
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     assert.ok(data.result);
-    assert.match(data.result.content[0].text, /WordPress preset 'landing' configured successfully/);
+    assert.match(
+      data.result.content[0].text,
+      /WordPress preset 'landing' configured successfully/,
+    );
   });
 });

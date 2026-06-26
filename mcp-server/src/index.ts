@@ -152,9 +152,7 @@ registerTelemetryTools(server, ssh, (target) => {
   }
   const prodHost = process.env.SSH_HOST;
   if (!prodHost) {
-    throw new Error(
-      "Production host not configured under SSH_HOST in .env",
-    );
+    throw new Error("Production host not configured under SSH_HOST in .env");
   }
   return prodHost;
 });

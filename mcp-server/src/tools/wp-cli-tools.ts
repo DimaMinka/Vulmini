@@ -349,24 +349,19 @@ export function registerWpCliTools(
       preset: z
         .enum(["landing", "blog", "portfolio", "woocommerce"])
         .describe("The template preset to configure"),
-      title: z
-        .string()
-        .optional()
-        .describe("New site title"),
-      admin_user: z
-        .string()
-        .optional()
-        .describe("Administrator username"),
-      admin_password: z
-        .string()
-        .optional()
-        .describe("Administrator password"),
-      admin_email: z
-        .string()
-        .optional()
-        .describe("Administrator email"),
+      title: z.string().optional().describe("New site title"),
+      admin_user: z.string().optional().describe("Administrator username"),
+      admin_password: z.string().optional().describe("Administrator password"),
+      admin_email: z.string().optional().describe("Administrator email"),
     },
-    async ({ target, preset, title, admin_user, admin_password, admin_email }) => {
+    async ({
+      target,
+      preset,
+      title,
+      admin_user,
+      admin_password,
+      admin_email,
+    }) => {
       try {
         const result = await wpCli.configurePreset(target, {
           preset,

@@ -10,7 +10,7 @@ AI-managed WordPress infrastructure on Vultr VPS. Employs a **Twin-Instance** mo
 
 A high-performance 6-container stack optimized for Vultr High-Frequency (Tel-Aviv NVMe) drives:
 
-- **`vulmini_app` (WordPress 6.7 + PHP 8.3 FPM):** System core. Built-in WP-Cron is disabled, and Redis Object Cache is integrated.
+- **`vulmini_app` (WordPress + PHP 8.4 FPM):** System core. Built-in WP-Cron is disabled, and Redis Object Cache is integrated.
 - **`vulmini_db` (MariaDB 11.4):** InnoDB parameters (`flush-method`, `buffer-pool`, `log-file-size`) are strictly tuned for NVMe performance.
 - **`vulmini_cron` (Dedicated Scheduler):** Separate lightweight PHP container running `wp-cron.php` every minute to offload tasks from the web server.
 - **`vulmini_cache` (Redis 7.2):** Object caching engine configured to cache database queries and transient records.

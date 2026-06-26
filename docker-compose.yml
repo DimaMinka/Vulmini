@@ -1,7 +1,7 @@
 # ==========================================
 # VULMINI — Production Docker Compose
 # ==========================================
-# Stack: Nginx + PHP-FPM 8.3 + MariaDB 11.4 + Redis 7.2
+# Stack: Nginx + PHP-FPM 8.4 + MariaDB 11.4 + Redis 7.2
 # Optimized for Vultr High-Frequency (Tel-Aviv)
 # Domain: vulmini.wl.mk | SSL: Let's Encrypt
 
@@ -86,7 +86,7 @@ services:
 
   # ── 3. PHP-FPM + WordPress — Compute Node ──
   vulmini_app:
-    image: wordpress:php8.3-fpm-alpine
+    image: wordpress:php8.4-fpm-alpine
     container_name: vulmini_app
     restart: always
     depends_on:
@@ -128,7 +128,7 @@ services:
   # ── 4. WP-Cron — Isolated for LearnDash ──
   # Newsletters, scheduled quizzes, drip content
   vulmini_cron:
-    image: wordpress:php8.3-fpm-alpine
+    image: wordpress:php8.4-fpm-alpine
     container_name: vulmini_cron
     restart: always
     depends_on:
